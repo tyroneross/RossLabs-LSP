@@ -42,7 +42,11 @@ pub fn serve() -> ! {
         let req: Value = match serde_json::from_str(trimmed) {
             Ok(v) => v,
             Err(e) => {
-                let _ = writeln!(out, "{}", error_frame(Value::Null, -32700, &format!("parse error: {e}")));
+                let _ = writeln!(
+                    out,
+                    "{}",
+                    error_frame(Value::Null, -32700, &format!("parse error: {e}"))
+                );
                 let _ = out.flush();
                 continue;
             }
@@ -85,14 +89,20 @@ fn handle(req: &Value) -> Option<Value> {
 }
 
 fn call_tool(params: &Value) -> Result<Value, String> {
-    let name = params.get("name").and_then(|v| v.as_str()).ok_or("missing tool name")?;
+    let name = params
+        .get("name")
+        .and_then(|v| v.as_str())
+        .ok_or("missing tool name")?;
     let args = params.get("arguments").cloned().unwrap_or(json!({}));
 
     if name == "doctor" {
         return Ok(tool_result(&query::doctor(), false));
     }
     let kind = Kind::parse(name).ok_or_else(|| format!("unknown tool: {name}"))?;
-    let file = args.get("file").and_then(|v| v.as_str()).ok_or("missing 'file'")?;
+    let file = args
+        .get("file")
+        .and_then(|v| v.as_str())
+        .ok_or("missing 'file'")?;
     let line = args.get("line").and_then(|v| v.as_u64()).unwrap_or(1) as usize;
     let col = args.get("column").and_then(|v| v.as_u64()).unwrap_or(1) as usize;
 
@@ -219,7 +229,10 @@ mod tests {
     fn every_tool_has_a_schema_and_matches_a_query_kind() {
         for t in tool_list() {
             let name = t["name"].as_str().unwrap();
-            assert!(t["inputSchema"]["type"] == "object", "{name} has no object schema");
+            assert!(
+                t["inputSchema"]["type"] == "object",
+                "{name} has no object schema"
+            );
             assert!(
                 name == "doctor" || Kind::parse(name).is_some(),
                 "tool {name} maps to no query kind"

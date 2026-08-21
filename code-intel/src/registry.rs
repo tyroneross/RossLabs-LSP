@@ -17,6 +17,9 @@ pub struct Server {
     pub extensions: &'static [&'static str],
     /// Where to get it, shown by `doctor` when the binary is missing.
     pub install: &'static str,
+    /// Measured cold-start time when it has been benchmarked on this host.
+    /// An absent value is deliberately not eligible for daemon pooling.
+    pub measured_cold_start: Option<std::time::Duration>,
 }
 
 pub const SERVERS: &[Server] = &[
@@ -26,6 +29,7 @@ pub const SERVERS: &[Server] = &[
         args: &["server"],
         extensions: &[".py", ".pyi"],
         install: "uv tool install ty",
+        measured_cold_start: Some(std::time::Duration::from_millis(210)),
     },
     Server {
         language_id: "rust",
@@ -33,6 +37,7 @@ pub const SERVERS: &[Server] = &[
         args: &[],
         extensions: &[".rs"],
         install: "brew install rust-analyzer",
+        measured_cold_start: Some(std::time::Duration::from_millis(9_870)),
     },
     Server {
         language_id: "swift",
@@ -40,6 +45,7 @@ pub const SERVERS: &[Server] = &[
         args: &[],
         extensions: &[".swift"],
         install: "ships with Xcode / the Swift toolchain",
+        measured_cold_start: Some(std::time::Duration::from_millis(1_510)),
     },
     Server {
         language_id: "typescript",
@@ -47,6 +53,7 @@ pub const SERVERS: &[Server] = &[
         args: &["--stdio"],
         extensions: &[".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"],
         install: "npm i -g typescript-language-server typescript",
+        measured_cold_start: None,
     },
     Server {
         language_id: "c",
@@ -54,6 +61,7 @@ pub const SERVERS: &[Server] = &[
         args: &[],
         extensions: &[".c", ".h", ".cc", ".cpp", ".hpp", ".m", ".mm"],
         install: "ships with Xcode / llvm",
+        measured_cold_start: None,
     },
 ];
 
@@ -63,6 +71,11 @@ pub fn for_path(path: &str) -> Option<&'static Server> {
     SERVERS
         .iter()
         .find(|s| s.extensions.iter().any(|e| *e == ext))
+}
+
+/// Find a server by the command used as the daemon pool key.
+pub fn by_command(command: &str) -> Option<&'static Server> {
+    SERVERS.iter().find(|server| server.command == command)
 }
 
 /// True when the server's binary resolves on PATH.

@@ -7,6 +7,7 @@
 //! than two: adding a third adapter later costs a translation layer, not a
 //! second implementation.
 
+use crate::daemon;
 use crate::lsp::{self, Client};
 use crate::registry;
 use serde_json::{json, Value};
@@ -50,10 +51,19 @@ impl Kind {
 /// the wrong tree and answers about the wrong code.
 pub fn workspace_root(path: &std::path::Path) -> String {
     const MARKERS: &[&str] = &[
-        ".git", "Cargo.toml", "pyproject.toml", "package.json",
-        "go.mod", "Package.swift", "compile_commands.json",
+        ".git",
+        "Cargo.toml",
+        "pyproject.toml",
+        "package.json",
+        "go.mod",
+        "Package.swift",
+        "compile_commands.json",
     ];
-    let mut dir = if path.is_dir() { Some(path) } else { path.parent() };
+    let mut dir = if path.is_dir() {
+        Some(path)
+    } else {
+        path.parent()
+    };
     while let Some(d) = dir {
         if MARKERS.iter().any(|m| d.join(m).exists()) {
             return d.to_string_lossy().into_owned();
@@ -86,7 +96,26 @@ pub fn run(kind: Kind, file: &str, line: usize, col: usize) -> Result<Value, Str
     }
 
     let root = workspace_root(std::path::Path::new(&abs));
+    if daemon::is_poolable(server) {
+        if let Some(result) = daemon::try_run(kind, &abs, line, col, &root, server.command)? {
+            return Ok(result);
+        }
+    }
     let mut client = Client::start(server, &root)?;
+    run_with_client(kind, &abs, line, col, &root, server, &mut client)
+}
+
+/// Run against an initialized client. The direct CLI/MCP path and daemon path
+/// intentionally share this function so pooling cannot change output shape.
+pub(crate) fn run_with_client(
+    kind: Kind,
+    abs: &str,
+    line: usize,
+    col: usize,
+    root: &str,
+    server: &registry::Server,
+    client: &mut Client,
+) -> Result<Value, String> {
     let uri = client.open(&abs, server.language_id)?;
 
     // Whether the server produced a usable answer rather than an early empty.
@@ -96,9 +125,7 @@ pub fn run(kind: Kind, file: &str, line: usize, col: usize) -> Result<Value, Str
             "textDocument/documentSymbol",
             json!({"textDocument": {"uri": uri}}),
         )?,
-        Kind::Diagnostics => {
-            client.wait_diagnostics(&uri, Duration::from_secs(30))?
-        }
+        Kind::Diagnostics => client.wait_diagnostics(&uri, Duration::from_secs(30))?,
         _ => {
             let text = std::fs::read_to_string(&abs).map_err(|e| e.to_string())?;
             let position = lsp::to_lsp_position(&text, line, col)?;
@@ -143,10 +170,12 @@ pub fn run(kind: Kind, file: &str, line: usize, col: usize) -> Result<Value, Str
                     }
                     Err(e) => return Err(e),
                 };
-                let empty = matches!(&a, Value::Null)
-                    || a.as_array().is_some_and(|x| x.is_empty());
+                let empty = matches!(&a, Value::Null) || a.as_array().is_some_and(|x| x.is_empty());
                 if !empty || std::time::Instant::now() >= deadline {
                     ready = !empty;
+                    if !empty {
+                        client.mark_proven_ready();
+                    }
                     answer = a;
                     break;
                 }
@@ -237,7 +266,11 @@ mod tests {
     fn doctor_reports_every_registered_server() {
         let d = doctor();
         assert_eq!(d["total"], registry::SERVERS.len());
-        assert!(d["servers"].as_array().unwrap().iter().all(|s| s["command"].is_string()));
+        assert!(d["servers"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|s| s["command"].is_string()));
     }
 
     #[test]

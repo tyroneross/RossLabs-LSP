@@ -11,7 +11,9 @@
 
 use crate::registry::Server;
 use serde_json::{json, Value};
+use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read, Write};
+use std::os::unix::process::CommandExt;
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError};
 use std::time::{Duration, Instant};
@@ -33,6 +35,19 @@ pub struct Client {
     /// Whether the server has ever reported progress. Servers that never do
     /// must not be waited on.
     saw_progress: bool,
+    /// Set once this server has returned a usable answer. A pooled server that
+    /// has already answered is known-ready, so the readiness grace below is
+    /// pure latency on every subsequent query — it was the whole 1.5s floor on
+    /// warm daemon queries until this flag existed.
+    proven_ready: bool,
+    /// Open document versions. Pooled clients update an existing buffer with
+    /// `didChange`; re-sending `didOpen` is invalid LSP and can return stale
+    /// diagnostics after a file changes.
+    opened: HashMap<String, i64>,
+    /// A pooled server gets a small forked parent-death guard. It kills the
+    /// whole server process group if the daemon dies unexpectedly.
+    parent_guard: Option<libc::pid_t>,
+    pooled: bool,
 }
 
 /// Wall-clock ceiling for one client session. A server that indexes forever
@@ -43,16 +58,49 @@ const DEADLINE: Duration = Duration::from_secs(90);
 impl Client {
     /// Spawn `server` rooted at `root` and complete the initialize handshake.
     pub fn start(server: &Server, root: &str) -> Result<Self, String> {
-        let mut child = Command::new(server.command)
+        Self::start_inner(server, root, false)
+    }
+
+    /// Start a daemon-owned client. Its process group and parent-death guard
+    /// ensure a pooled server cannot survive an unclean daemon exit.
+    pub fn start_pooled(server: &Server, root: &str) -> Result<Self, String> {
+        Self::start_inner(server, root, true)
+    }
+
+    fn start_inner(server: &Server, root: &str, pooled: bool) -> Result<Self, String> {
+        let mut command = Command::new(server.command);
+        command
             .args(server.args)
             .current_dir(root)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::null())
+            .stderr(Stdio::null());
+        if pooled {
+            // Children of this LSP inherit the group, so one kill reaps the
+            // server and workers such as SourceKitService together.
+            unsafe {
+                command.pre_exec(|| {
+                    if libc::setpgid(0, 0) == -1 {
+                        Err(std::io::Error::last_os_error())
+                    } else {
+                        Ok(())
+                    }
+                });
+            }
+        }
+        let mut child = command
             .spawn()
             .map_err(|e| format!("cannot start {}: {e}", server.command))?;
 
         let pid = child.id();
+        // Fork before starting this client's reader/timer threads. The guard's
+        // child branch uses only async-signal-safe libc calls, which remains
+        // safe even if the daemon already owns other pooled reader threads.
+        let parent_guard = if pooled {
+            spawn_parent_guard(std::process::id(), pid)
+        } else {
+            None
+        };
         std::thread::spawn(move || {
             std::thread::sleep(DEADLINE);
             // Kills only if still alive; a finished pid has already been reaped.
@@ -64,8 +112,17 @@ impl Client {
         let (tx, rx) = mpsc::channel();
         std::thread::spawn(move || read_frames(stdout, tx));
         let mut c = Client {
-            child, stdin, rx, next_id: 0,
-            diagnostics: Vec::new(), progress: Vec::new(), saw_progress: false,
+            child,
+            stdin,
+            rx,
+            next_id: 0,
+            diagnostics: Vec::new(),
+            progress: Vec::new(),
+            proven_ready: false,
+            saw_progress: false,
+            opened: HashMap::new(),
+            parent_guard,
+            pooled,
         };
 
         let init = c.request(
@@ -91,11 +148,23 @@ impl Client {
     pub fn open(&mut self, path: &str, language_id: &str) -> Result<String, String> {
         let text = std::fs::read_to_string(path).map_err(|e| format!("cannot read {path}: {e}"))?;
         let uri = path_to_uri(path);
-        self.notify(
-            "textDocument/didOpen",
-            json!({"textDocument": {
-                "uri": uri, "languageId": language_id, "version": 1, "text": text }}),
-        )?;
+        if let Some(version) = self.opened.get_mut(&uri) {
+            *version += 1;
+            let next_version = *version;
+            self.diagnostics.retain(|(known_uri, _)| known_uri != &uri);
+            self.notify(
+                "textDocument/didChange",
+                json!({"textDocument": {"uri": uri, "version": next_version},
+                    "contentChanges": [{"text": text}]}),
+            )?;
+        } else {
+            self.notify(
+                "textDocument/didOpen",
+                json!({"textDocument": {
+                    "uri": uri, "languageId": language_id, "version": 1, "text": text }}),
+            )?;
+            self.opened.insert(uri.clone(), 1);
+        }
         Ok(uri)
     }
 
@@ -108,7 +177,10 @@ impl Client {
             self.absorb_notification(&msg);
             if msg.get("id").and_then(|v| v.as_i64()) == Some(id) {
                 if let Some(err) = msg.get("error") {
-                    let m = err.get("message").and_then(|v| v.as_str()).unwrap_or("unknown");
+                    let m = err
+                        .get("message")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("unknown");
                     let code = err.get("code").and_then(|v| v.as_i64()).unwrap_or(0);
                     // -32801 ContentModified / -32802 ServerCancelled are the
                     // protocol's own "ask again" signals, not failures. Keep the
@@ -153,6 +225,11 @@ impl Client {
     /// back `[]` in milliseconds and is indistinguishable from a genuine "no
     /// results" — a false negative an agent would act on.
     pub fn wait_until_idle(&mut self, budget: Duration) -> bool {
+        // A server that has already answered cannot be mid-load. Waiting again
+        // buys nothing and costs the full grace on every warm query.
+        if self.proven_ready {
+            return true;
+        }
         let deadline = Instant::now() + budget;
         // Give a server that reports progress a moment to announce it. One that
         // never reports is idle by definition and must not be waited on.
@@ -180,11 +257,20 @@ impl Client {
         }
     }
 
+    /// Record that this server produced a usable answer.
+    pub fn mark_proven_ready(&mut self) {
+        self.proven_ready = true;
+    }
+
     fn absorb_notification(&mut self, msg: &Value) {
         if msg.get("method").and_then(|v| v.as_str()) == Some("$/progress") {
             if let Some(p) = msg.get("params") {
                 let token = p.get("token").map(|t| t.to_string()).unwrap_or_default();
-                match p.get("value").and_then(|v| v.get("kind")).and_then(|k| k.as_str()) {
+                match p
+                    .get("value")
+                    .and_then(|v| v.get("kind"))
+                    .and_then(|k| k.as_str())
+                {
                     Some("begin") => {
                         self.saw_progress = true;
                         self.progress.push(token);
@@ -271,8 +357,43 @@ impl Drop for Client {
     fn drop(&mut self) {
         let _ = self.notify("shutdown", json!(null));
         let _ = self.notify("exit", json!(null));
+        if self.pooled {
+            unsafe { libc::kill(-(self.child.id() as i32), libc::SIGKILL) };
+        }
         let _ = self.child.kill();
         let _ = self.child.wait();
+        if let Some(guard) = self.parent_guard.take() {
+            unsafe {
+                libc::kill(guard, libc::SIGTERM);
+                libc::waitpid(guard, std::ptr::null_mut(), 0);
+            }
+        }
+    }
+}
+
+/// Fork an allocation-free guard process for one daemon-owned server group.
+/// If the daemon is killed (including SIGKILL), the guard observes reparenting
+/// and kills the group. This is necessary because child processes do not die
+/// automatically when their parent exits on macOS or Linux.
+fn spawn_parent_guard(parent_pid: u32, group_leader: u32) -> Option<libc::pid_t> {
+    unsafe {
+        let guard = libc::fork();
+        if guard > 0 {
+            return Some(guard);
+        }
+        if guard < 0 {
+            return None;
+        }
+        loop {
+            if libc::getppid() != parent_pid as libc::pid_t {
+                libc::kill(-(group_leader as libc::pid_t), libc::SIGKILL);
+                libc::_exit(0);
+            }
+            if libc::kill(-(group_leader as libc::pid_t), 0) == -1 {
+                libc::_exit(0);
+            }
+            libc::usleep(100_000);
+        }
     }
 }
 
@@ -304,11 +425,7 @@ pub fn to_lsp_position(text: &str, line_1: usize, char_1: usize) -> Result<Value
         .lines()
         .nth(line_0)
         .ok_or_else(|| format!("line {line_1} is past end of file"))?;
-    let utf16: usize = line
-        .chars()
-        .take(char_0)
-        .map(|c| c.len_utf16())
-        .sum();
+    let utf16: usize = line.chars().take(char_0).map(|c| c.len_utf16()).sum();
     Ok(json!({"line": line_0, "character": utf16}))
 }
 

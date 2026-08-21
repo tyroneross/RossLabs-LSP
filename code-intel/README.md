@@ -105,11 +105,27 @@ measured failure mode, not a theoretical one — see `easy-terminal/docs/lsp-mem
 SIGTERM/INT/HUP, parent-death watchdog, and an opt-in idle timeout. Verified with
 that spec's own `conformance.mjs`.
 
+## The daemon
+
+`code-intel daemon` keeps eligible language servers warm on a Unix socket. Measured
+on this host, repeated `refs` against a Rust workspace:
+
+| | first query | repeat |
+|---|---|---|
+| no daemon | 7.9s | 4.2s |
+| daemon | 6.0s | **0.05s** |
+
+Only servers whose measured cold start exceeds a threshold are pooled — `ty` at 0.06s
+is not, and bypasses the daemon entirely rather than paying a socket round-trip for
+nothing. Servers idle out after 5 minutes.
+
+The daemon is a latency optimization and never a behavior change: both paths run the
+same `run_with_client`, and output parity is checked rather than assumed. If the socket
+is absent or stale, the CLI spawns directly and still answers.
+
 ## Status
 
-v0.1. Servers are spawned per invocation; a resident warm pool is v0.2, and it is
-what will make cold-start-heavy servers (rust-analyzer, jdtls) fast rather than
-merely correct.
+v0.2.
 
 ## License
 

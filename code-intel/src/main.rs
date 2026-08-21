@@ -8,6 +8,7 @@
 //!
 //! Both go through query.rs. Neither knows the other exists.
 
+mod daemon;
 mod lsp;
 mod mcp;
 mod query;
@@ -21,6 +22,7 @@ code-intel — compiler-grade code intelligence for any agent
 USAGE
   code-intel <query> <file>[:<line>:<column>]
   code-intel mcp
+  code-intel daemon
   code-intel doctor
 
 QUERIES
@@ -37,6 +39,7 @@ EXAMPLES
 
 MODES
   mcp       serve the same queries over MCP stdio (for Claude Code, Codex, ...)
+  daemon    keep eligible language servers warm over a local Unix socket
 
 Output is JSON on stdout. Errors go to stderr with a non-zero exit.
 ";
@@ -58,16 +61,24 @@ fn run(args: &[String]) -> Result<String, String> {
         "" | "-h" | "--help" | "help" => Ok(USAGE.trim_end().to_string()),
         "--version" | "-V" => Ok(format!("code-intel {}", env!("CARGO_PKG_VERSION"))),
         "mcp" => mcp::serve(),
+        "daemon" => {
+            daemon::serve()?;
+            Ok(String::new())
+        }
         "doctor" => pretty(&query::doctor()),
         verb => {
-            let kind = Kind::parse(verb)
-                .ok_or_else(|| format!("unknown query '{verb}' (try --help)"))?;
+            let kind =
+                Kind::parse(verb).ok_or_else(|| format!("unknown query '{verb}' (try --help)"))?;
             let target = args.get(1).ok_or("missing <file>[:line:column]")?;
             let (file, line, col) = split_target(target)?;
             if kind.needs_position() && (line, col) == (0, 0) {
                 return Err(format!("{verb} needs a position, e.g. {file}:42:11"));
             }
-            let (line, col) = if (line, col) == (0, 0) { (1, 1) } else { (line, col) };
+            let (line, col) = if (line, col) == (0, 0) {
+                (1, 1)
+            } else {
+                (line, col)
+            };
             pretty(&query::run(kind, &file, line, col)?)
         }
     }
