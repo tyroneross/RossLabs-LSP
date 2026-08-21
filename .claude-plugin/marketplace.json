@@ -1,0 +1,19 @@
+{
+  "name": "rosslabs-lsp",
+  "owner": {
+    "name": "Tyrone Ross",
+    "email": "tyrone@rosslabs.ai"
+  },
+  "metadata": {
+    "description": "Language Server Protocol tooling for coding agents — vendor-neutral CLI/MCP bridge plus Claude Code LSP plugins",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "ty-lsp",
+      "description": "Python language server (ty, by Astral) for code intelligence and type checking",
+      "source": "./plugins/ty-lsp",
+      "category": "development"
+    }
+  ]
+}

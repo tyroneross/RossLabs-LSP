@@ -1,0 +1,19 @@
+{
+  "name": "ty-lsp",
+  "description": "Python language server (ty, by Astral) for code intelligence and type checking",
+  "version": "0.1.0",
+  "author": {
+    "name": "Tyrone Ross",
+    "email": "tyrone@rosslabs.ai"
+  },
+  "lspServers": {
+    "ty": {
+      "command": "ty",
+      "args": ["server"],
+      "extensionToLanguage": {
+        ".py": "python",
+        ".pyi": "python"
+      }
+    }
+  }
+}

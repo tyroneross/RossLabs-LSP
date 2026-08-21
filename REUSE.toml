@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Tyrone Ross, Jr <46267523+tyroneross@users.noreply.github.com>
+# SPDX-License-Identifier: Apache-2.0
+#
+# REUSE 3.3 annotations for files that cannot carry an in-file SPDX header
+# (JSON and TOML metadata, lockfiles, top-level docs).
+#
+# Spec: https://reuse.software/spec-3.3/
+# Validate: `uvx reuse lint`
+
+version = 1
+
+[[annotations]]
+path = [
+    "**/*.json",
+    "**/*.toml",
+    "**/Cargo.lock",
+    "**/*.md",
+    "NOTICE",
+    ".gitignore",
+    "**/.gitignore",
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Tyrone Ross, Jr <46267523+tyroneross@users.noreply.github.com>"
+SPDX-License-Identifier = "Apache-2.0"
