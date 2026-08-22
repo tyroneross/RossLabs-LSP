@@ -23,3 +23,4 @@
 .navgator/scan.lock*
 .navgator/architecture/freshness.json.tmp*
 # <<< NavGator safety guard
+.serena/
