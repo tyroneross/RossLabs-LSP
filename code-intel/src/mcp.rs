@@ -11,6 +11,7 @@
 //! Note the framing differs from LSP: MCP stdio is newline-delimited JSON,
 //! not Content-Length framed.
 
+use crate::daemon;
 use crate::query::{self, Kind};
 use crate::selector::Selector;
 use serde_json::{json, Value};
@@ -24,6 +25,9 @@ const PROTOCOL_VERSION: &str = "2025-06-18";
 static LAST_FRAME_MS: AtomicU64 = AtomicU64::new(0);
 
 pub fn serve() -> ! {
+    // An MCP session is long-lived, so a warm pool is the difference between
+    // 0.02s and 3.5s per query. Best-effort: queries still work without it.
+    daemon::ensure_running();
     install_signal_handlers(); // L2
     let start = Instant::now();
     spawn_watchdog(start); // L3 + L4
