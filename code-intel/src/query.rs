@@ -81,7 +81,7 @@ pub fn workspace_root(path: &std::path::Path) -> String {
 ///
 /// The envelope is identical for both adapters — the CLI prints it, the MCP
 /// adapter wraps it in a tool result. Neither reformats it.
-pub fn run(kind: Kind, file: &str, sel: Selector) -> Result<Value, String> {
+pub fn run(kind: Kind, file: &str, sel: Selector, raw: bool) -> Result<Value, String> {
     let abs = std::fs::canonicalize(file)
         .map_err(|e| format!("cannot resolve {file}: {e}"))?
         .to_string_lossy()
@@ -98,12 +98,12 @@ pub fn run(kind: Kind, file: &str, sel: Selector) -> Result<Value, String> {
 
     let root = workspace_root(std::path::Path::new(&abs));
     if daemon::is_poolable(server) {
-        if let Some(result) = daemon::try_run(kind, &abs, &sel, &root, server.command)? {
+        if let Some(result) = daemon::try_run(kind, &abs, &sel, &root, server.command, raw)? {
             return Ok(result);
         }
     }
     let mut client = Client::start(server, &root)?;
-    run_with_client(kind, &abs, &sel, &root, server, &mut client)
+    run_with_client(kind, &abs, &sel, &root, server, &mut client, raw)
 }
 
 /// Run against an initialized client. The direct CLI/MCP path and daemon path
@@ -115,6 +115,7 @@ pub(crate) fn run_with_client(
     root: &str,
     server: &registry::Server,
     client: &mut Client,
+    raw: bool,
 ) -> Result<Value, String> {
     let uri = client.open(&abs, server.language_id)?;
 
@@ -215,6 +216,14 @@ pub(crate) fn run_with_client(
         _ => false,
     };
 
+    // Compact by default. A caller is an agent paying for every token of this
+    // payload, and raw LSP locations carry a full URI plus a four-number range
+    // per hit where `path:line` and the containing symbol are what get acted
+    // on. Measured on this repo: raw output cost 3x what grep cost for the
+    // same question; compacting is the difference between the tool saving
+    // context and spending it. `--raw` keeps the untouched LSP shape.
+    let result = if raw { result } else { compact(&result, root) };
+
     let mut envelope = json!({
         "query": format!("{kind:?}").to_lowercase(),
         "file": abs,
@@ -231,6 +240,46 @@ pub(crate) fn run_with_client(
         );
     }
     Ok(envelope)
+}
+
+/// Reduce LSP locations to what a caller acts on: a repo-relative path, a
+/// 1-based line, and the symbol containing the hit.
+///
+/// Anything not recognised as a location list passes through untouched, so
+/// hover and diagnostics keep their own shapes.
+fn compact(result: &Value, root: &str) -> Value {
+    let Some(items) = result.as_array() else {
+        return result.clone();
+    };
+    let prefix = format!("file://{root}/");
+    let mut out = Vec::with_capacity(items.len());
+    for item in items {
+        let uri = item
+            .get("uri")
+            .or_else(|| item.get("targetUri"))
+            .and_then(|v| v.as_str());
+        let range = item
+            .get("range")
+            .or_else(|| item.get("targetSelectionRange"));
+        let (Some(uri), Some(range)) = (uri, range) else {
+            out.push(item.clone());
+            continue;
+        };
+        let line = range
+            .get("start")
+            .and_then(|s| s.get("line"))
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0)
+            + 1;
+        let path = percent_decode(uri.strip_prefix(&prefix).unwrap_or(uri));
+        let mut o = serde_json::Map::new();
+        o.insert("at".into(), json!(format!("{path}:{line}")));
+        if let Some(sym) = item.get("in_symbol") {
+            o.insert("in".into(), sym.clone());
+        }
+        out.push(Value::Object(o));
+    }
+    Value::Array(out)
 }
 
 /// Add `in_symbol` to each location by asking each referenced file for its
@@ -375,7 +424,7 @@ mod tests {
 
     #[test]
     fn unknown_extension_is_rejected_before_spawning() {
-        let err = run(Kind::Symbols, "Cargo.toml", Selector::Whole).unwrap_err();
+        let err = run(Kind::Symbols, "Cargo.toml", Selector::Whole, false).unwrap_err();
         assert!(err.contains("no language server"), "got: {err}");
     }
 }

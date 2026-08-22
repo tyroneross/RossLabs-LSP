@@ -101,6 +101,7 @@ pub fn try_run(
     sel: &Selector,
     root: &str,
     command: &str,
+    raw: bool,
 ) -> Result<Option<Value>, String> {
     let mut stream = match UnixStream::connect(socket_path()) {
         Ok(stream) => stream,
@@ -120,7 +121,11 @@ pub fn try_run(
     };
     let request = json!({
         "kind": kind.name(), "file": file, "line": line, "column": col,
-        "symbol": symbol, "root": root, "command": command,
+        "symbol": symbol, "root": root, "command": command, "raw": raw,
+        // A daemon built from an older binary answers with that binary's
+        // behaviour, silently. Two stale daemons served pre-compaction output
+        // here and the only symptom was a token count. Version-gate instead.
+        "protocol": env!("CARGO_PKG_VERSION"),
     });
     if write_frame(&mut stream, &request).is_err() {
         return Ok(None);
@@ -169,8 +174,8 @@ fn handle_connection(stream: UnixStream, pool: &mut Pool) {
     let response = match stream.try_clone() {
         Ok(input) => match read_frame(input) {
             Ok(request) => match request_to_query(&request) {
-                Ok((kind, file, sel, root, command)) => pool
-                    .run(kind, &file, &sel, &root, &command)
+                Ok((kind, file, sel, raw, root, command)) => pool
+                    .run(kind, &file, &sel, &root, &command, raw)
                     .map(|result| json!({"ok": true, "result": result}))
                     .unwrap_or_else(|error| json!({"ok": false, "error": error})),
                 Err(error) => json!({"ok": false, "error": error}),
@@ -185,7 +190,7 @@ fn handle_connection(stream: UnixStream, pool: &mut Pool) {
 
 fn request_to_query(
     request: &Value,
-) -> Result<(Kind, String, Selector, String, String), String> {
+) -> Result<(Kind, String, Selector, bool, String, String), String> {
     let field = |name: &str| {
         request
             .get(name)
@@ -211,10 +216,19 @@ fn request_to_query(
         None if line > 0 && col > 0 => Selector::Position { line, col },
         None => Selector::Whole,
     };
+    let raw = request.get("raw").and_then(Value::as_bool).unwrap_or(false);
+    let peer = request.get("protocol").and_then(Value::as_str).unwrap_or("");
+    if peer != env!("CARGO_PKG_VERSION") {
+        return Err(format!(
+            "daemon is version {} but the client is {peer}; restart the daemon",
+            env!("CARGO_PKG_VERSION")
+        ));
+    }
     Ok((
         kind,
         field("file")?.to_string(),
         sel,
+        raw,
         field("root")?.to_string(),
         field("command")?.to_string(),
     ))
@@ -244,6 +258,7 @@ impl Pool {
         sel: &Selector,
         root: &str,
         command: &str,
+        raw: bool,
     ) -> Result<Value, String> {
         let server = registry::by_command(command).ok_or("daemon request has unknown server")?;
         if !is_poolable(server) {
@@ -266,7 +281,7 @@ impl Pool {
         let result = {
             let entry = self.entries.get_mut(&key).expect("entry inserted above");
             let result =
-                query::run_with_client(kind, file, sel, root, server, &mut entry.client);
+                query::run_with_client(kind, file, sel, root, server, &mut entry.client, raw);
             if result.is_ok() {
                 entry.last_used = Instant::now();
             }
@@ -349,11 +364,25 @@ mod tests {
         assert!(request_to_query(&json!({"kind": "refs"})).is_err());
         let parsed = request_to_query(&json!({
             "kind": "refs", "file": "/tmp/a.rs", "line": 1, "column": 2,
-            "root": "/tmp", "command": "rust-analyzer"
+            "root": "/tmp", "command": "rust-analyzer",
+            "protocol": env!("CARGO_PKG_VERSION")
         }))
         .unwrap();
         assert_eq!(parsed.0, Kind::References);
         assert_eq!(parsed.2, Selector::Position { line: 1, col: 2 });
+        assert!(!parsed.3, "raw defaults off");
+    }
+
+    #[test]
+    fn a_daemon_from_a_different_build_is_refused_not_trusted() {
+        // Two stale daemons once served pre-compaction output and the only
+        // symptom was a token count. A mismatch must fail loudly.
+        let err = request_to_query(&json!({
+            "kind": "refs", "file": "/tmp/a.rs", "line": 1, "column": 2,
+            "root": "/tmp", "command": "rust-analyzer", "protocol": "0.0.1-old"
+        }))
+        .unwrap_err();
+        assert!(err.contains("restart the daemon"), "got: {err}");
     }
 
     #[test]

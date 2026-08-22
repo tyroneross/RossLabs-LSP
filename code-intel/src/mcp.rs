@@ -127,7 +127,7 @@ fn call_tool(params: &Value) -> Result<Value, String> {
 
     // A failed query is a tool error, not a protocol error: the host should
     // show the model what went wrong so it can correct, not drop the turn.
-    Ok(match query::run(kind, file, sel) {
+    Ok(match query::run(kind, file, sel, false) {
         Ok(v) => tool_result(&v, false),
         Err(e) => tool_result(&json!({"error": e}), true),
     })

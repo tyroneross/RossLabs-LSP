@@ -26,6 +26,9 @@ USAGE
   code-intel daemon
   code-intel doctor
 
+OPTIONS
+  --raw     emit untouched LSP payloads instead of compact locations
+
 QUERIES
   def       definition of the symbol at a position
   refs      every reference to the symbol at a position
@@ -71,13 +74,14 @@ fn run(args: &[String]) -> Result<String, String> {
             let kind =
                 Kind::parse(verb).ok_or_else(|| format!("unknown query '{verb}' (try --help)"))?;
             let target = args.get(1).ok_or("missing <file>[::symbol | :line:col]")?;
+            let raw = args.iter().any(|a| a == "--raw");
             let (file, sel) = selector::Selector::parse(target);
             if kind.needs_position() && !sel.is_point() {
                 return Err(format!(
                     "{verb} needs a symbol or position, e.g. {file}::my_function or {file}:42:11"
                 ));
             }
-            pretty(&query::run(kind, &file, sel)?)
+            pretty(&query::run(kind, &file, sel, raw)?)
         }
     }
 }
