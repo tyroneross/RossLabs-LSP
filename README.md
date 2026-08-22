@@ -32,6 +32,17 @@ code-intel doctor                      # which language servers are present
 code-intel refs src/query.rs:51:8      # every caller of a symbol
 ```
 
+Optionally keep slow servers warm:
+
+```bash
+code-intel daemon &                    # pools rust-analyzer, sourcekit-lsp
+```
+
+Measured here, repeated `refs` against a Rust workspace: **4.2s without the daemon,
+0.05s with it**. Fast servers like `ty` (0.06s) are never pooled — they bypass the
+daemon rather than pay a socket round-trip. The daemon is optional: if it is not
+running, the CLI spawns directly and returns the same answer.
+
 Register it as an MCP server — Codex CLI, `~/.codex/config.toml`:
 
 ```toml
