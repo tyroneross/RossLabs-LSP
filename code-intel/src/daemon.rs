@@ -9,6 +9,7 @@
 
 use crate::lsp::Client;
 use crate::query::{self, Kind};
+use crate::selector::Selector;
 use crate::registry::{self, Server};
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -63,8 +64,7 @@ pub fn serve() -> Result<(), String> {
 pub fn try_run(
     kind: Kind,
     file: &str,
-    line: usize,
-    col: usize,
+    sel: &Selector,
     root: &str,
     command: &str,
 ) -> Result<Option<Value>, String> {
@@ -77,9 +77,16 @@ pub fn try_run(
     {
         return Ok(None);
     }
+    // The selector travels whole. Resolving it client-side would need a
+    // language server here, which is exactly what the daemon exists to avoid.
+    let (line, col, symbol) = match sel {
+        Selector::Position { line, col } => (*line, *col, Value::Null),
+        Selector::Symbol { path } => (0, 0, json!(path)),
+        Selector::Whole => (1, 1, Value::Null),
+    };
     let request = json!({
         "kind": kind.name(), "file": file, "line": line, "column": col,
-        "root": root, "command": command,
+        "symbol": symbol, "root": root, "command": command,
     });
     if write_frame(&mut stream, &request).is_err() {
         return Ok(None);
@@ -128,8 +135,8 @@ fn handle_connection(stream: UnixStream, pool: &mut Pool) {
     let response = match stream.try_clone() {
         Ok(input) => match read_frame(input) {
             Ok(request) => match request_to_query(&request) {
-                Ok((kind, file, line, col, root, command)) => pool
-                    .run(kind, &file, line, col, &root, &command)
+                Ok((kind, file, sel, root, command)) => pool
+                    .run(kind, &file, &sel, &root, &command)
                     .map(|result| json!({"ok": true, "result": result}))
                     .unwrap_or_else(|error| json!({"ok": false, "error": error})),
                 Err(error) => json!({"ok": false, "error": error}),
@@ -144,7 +151,7 @@ fn handle_connection(stream: UnixStream, pool: &mut Pool) {
 
 fn request_to_query(
     request: &Value,
-) -> Result<(Kind, String, usize, usize, String, String), String> {
+) -> Result<(Kind, String, Selector, String, String), String> {
     let field = |name: &str| {
         request
             .get(name)
@@ -160,11 +167,20 @@ fn request_to_query(
         .get("column")
         .and_then(Value::as_u64)
         .ok_or("daemon request missing 'column'")? as usize;
+    let sel = match request.get("symbol").and_then(Value::as_array) {
+        Some(parts) => Selector::Symbol {
+            path: parts
+                .iter()
+                .filter_map(|v| v.as_str().map(str::to_string))
+                .collect(),
+        },
+        None if line > 0 && col > 0 => Selector::Position { line, col },
+        None => Selector::Whole,
+    };
     Ok((
         kind,
         field("file")?.to_string(),
-        line,
-        col,
+        sel,
         field("root")?.to_string(),
         field("command")?.to_string(),
     ))
@@ -191,8 +207,7 @@ impl Pool {
         &mut self,
         kind: Kind,
         file: &str,
-        line: usize,
-        col: usize,
+        sel: &Selector,
         root: &str,
         command: &str,
     ) -> Result<Value, String> {
@@ -217,7 +232,7 @@ impl Pool {
         let result = {
             let entry = self.entries.get_mut(&key).expect("entry inserted above");
             let result =
-                query::run_with_client(kind, file, line, col, root, server, &mut entry.client);
+                query::run_with_client(kind, file, sel, root, server, &mut entry.client);
             if result.is_ok() {
                 entry.last_used = Instant::now();
             }
@@ -304,7 +319,7 @@ mod tests {
         }))
         .unwrap();
         assert_eq!(parsed.0, Kind::References);
-        assert_eq!((parsed.2, parsed.3), (1, 2));
+        assert_eq!(parsed.2, Selector::Position { line: 1, col: 2 });
     }
 
     #[test]

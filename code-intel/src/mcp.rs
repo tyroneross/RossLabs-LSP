@@ -12,6 +12,7 @@
 //! not Content-Length framed.
 
 use crate::query::{self, Kind};
+use crate::selector::Selector;
 use serde_json::{json, Value};
 use std::io::{BufRead, Write};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -103,12 +104,26 @@ fn call_tool(params: &Value) -> Result<Value, String> {
         .get("file")
         .and_then(|v| v.as_str())
         .ok_or("missing 'file'")?;
-    let line = args.get("line").and_then(|v| v.as_u64()).unwrap_or(1) as usize;
-    let col = args.get("column").and_then(|v| v.as_u64()).unwrap_or(1) as usize;
+    // Prefer a symbol name: it survives edits between the model planning the
+    // call and the file being read. line/col stays for exact positions.
+    let sel = match args.get("symbol").and_then(|v| v.as_str()) {
+        Some(sym) if !sym.is_empty() => Selector::Symbol {
+            path: sym.split('/').filter(|s| !s.is_empty()).map(str::to_string).collect(),
+        },
+        _ => {
+            let line = args.get("line").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+            let col = args.get("column").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+            if line > 0 && col > 0 {
+                Selector::Position { line, col }
+            } else {
+                Selector::Whole
+            }
+        }
+    };
 
     // A failed query is a tool error, not a protocol error: the host should
     // show the model what went wrong so it can correct, not drop the turn.
-    Ok(match query::run(kind, file, line, col) {
+    Ok(match query::run(kind, file, sel) {
         Ok(v) => tool_result(&v, false),
         Err(e) => tool_result(&json!({"error": e}), true),
     })
@@ -130,10 +145,11 @@ fn tool_list() -> Vec<Value> {
                 "type": "object",
                 "properties": {
                     "file": {"type": "string", "description": "Path to the source file"},
-                    "line": {"type": "integer", "description": "1-based line number"},
-                    "column": {"type": "integer", "description": "1-based column number"}
+                    "symbol": {"type": "string", "description": "Symbol name, e.g. \"my_function\" or \"MyType/method\". Preferred over line/column — it stays correct if the file changes."},
+                    "line": {"type": "integer", "description": "1-based line number (only if no symbol given)"},
+                    "column": {"type": "integer", "description": "1-based column number (only if no symbol given)"}
                 },
-                "required": ["file", "line", "column"]
+                "required": ["file"]
             }
         })
     };

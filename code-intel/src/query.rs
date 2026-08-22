@@ -10,6 +10,7 @@
 use crate::daemon;
 use crate::lsp::{self, Client};
 use crate::registry;
+use crate::selector::{self, Selector};
 use serde_json::{json, Value};
 use std::time::Duration;
 
@@ -80,7 +81,7 @@ pub fn workspace_root(path: &std::path::Path) -> String {
 ///
 /// The envelope is identical for both adapters — the CLI prints it, the MCP
 /// adapter wraps it in a tool result. Neither reformats it.
-pub fn run(kind: Kind, file: &str, line: usize, col: usize) -> Result<Value, String> {
+pub fn run(kind: Kind, file: &str, sel: Selector) -> Result<Value, String> {
     let abs = std::fs::canonicalize(file)
         .map_err(|e| format!("cannot resolve {file}: {e}"))?
         .to_string_lossy()
@@ -97,12 +98,12 @@ pub fn run(kind: Kind, file: &str, line: usize, col: usize) -> Result<Value, Str
 
     let root = workspace_root(std::path::Path::new(&abs));
     if daemon::is_poolable(server) {
-        if let Some(result) = daemon::try_run(kind, &abs, line, col, &root, server.command)? {
+        if let Some(result) = daemon::try_run(kind, &abs, &sel, &root, server.command)? {
             return Ok(result);
         }
     }
     let mut client = Client::start(server, &root)?;
-    run_with_client(kind, &abs, line, col, &root, server, &mut client)
+    run_with_client(kind, &abs, &sel, &root, server, &mut client)
 }
 
 /// Run against an initialized client. The direct CLI/MCP path and daemon path
@@ -110,8 +111,7 @@ pub fn run(kind: Kind, file: &str, line: usize, col: usize) -> Result<Value, Str
 pub(crate) fn run_with_client(
     kind: Kind,
     abs: &str,
-    line: usize,
-    col: usize,
+    sel: &Selector,
     root: &str,
     server: &registry::Server,
     client: &mut Client,
@@ -127,8 +127,23 @@ pub(crate) fn run_with_client(
         )?,
         Kind::Diagnostics => client.wait_diagnostics(&uri, Duration::from_secs(30))?,
         _ => {
-            let text = std::fs::read_to_string(&abs).map_err(|e| e.to_string())?;
-            let position = lsp::to_lsp_position(&text, line, col)?;
+            // Resolve the selector to a concrete position. A symbol path is
+            // looked up in this file's own symbol tree, so it stays correct
+            // when unrelated lines above it move.
+            let position = match sel {
+                Selector::Position { line, col } => {
+                    let text = std::fs::read_to_string(abs).map_err(|e| e.to_string())?;
+                    lsp::to_lsp_position(&text, *line, *col)?
+                }
+                Selector::Symbol { path } => {
+                    let tree = client.request(
+                        "textDocument/documentSymbol",
+                        json!({"textDocument": {"uri": uri}}),
+                    )?;
+                    selector::resolve_symbol(&tree, path)?
+                }
+                Selector::Whole => return Err("this query needs a symbol or position".into()),
+            };
             let (method, extra) = match kind {
                 Kind::Definition => ("textDocument/definition", json!({})),
                 Kind::References => (
@@ -185,6 +200,15 @@ pub(crate) fn run_with_client(
         }
     };
 
+    // Name the symbol containing each hit. "registry.rs:107" tells a caller
+    // where; "tests/maps_extension_to_server" tells them what — which is the
+    // difference between a line number and a fact they can act on.
+    let result = if matches!(kind, Kind::References | Kind::Definition) {
+        annotate_containers(client, server, &result)
+    } else {
+        result
+    };
+
     let empty = match &result {
         Value::Null => true,
         Value::Array(a) => a.is_empty(),
@@ -207,6 +231,82 @@ pub(crate) fn run_with_client(
         );
     }
     Ok(envelope)
+}
+
+/// Add `in_symbol` to each location by asking each referenced file for its
+/// symbol tree and finding the innermost span containing the hit.
+///
+/// Best-effort: a file we cannot open simply keeps its bare location rather
+/// than failing the whole query.
+fn annotate_containers(client: &mut Client, server: &registry::Server, result: &Value) -> Value {
+    let Some(items) = result.as_array() else {
+        return result.clone();
+    };
+    let mut trees: std::collections::HashMap<String, Value> = std::collections::HashMap::new();
+    let mut out = Vec::with_capacity(items.len());
+
+    for item in items {
+        let mut item = item.clone();
+        let uri = item
+            .get("uri")
+            .or_else(|| item.get("targetUri"))
+            .and_then(|v| v.as_str())
+            .map(str::to_string);
+        let line = item
+            .get("range")
+            .or_else(|| item.get("targetSelectionRange"))
+            .and_then(|r| r.get("start"))
+            .and_then(|s| s.get("line"))
+            .and_then(|v| v.as_u64())
+            .map(|v| v as usize);
+
+        if let (Some(uri), Some(line)) = (uri, line) {
+            if !trees.contains_key(&uri) {
+                let path = uri.strip_prefix("file://").unwrap_or(&uri);
+                let decoded = percent_decode(path);
+                let opened = client.open(&decoded, server.language_id).is_ok();
+                let tree = if opened {
+                    client
+                        .request(
+                            "textDocument/documentSymbol",
+                            json!({"textDocument": {"uri": uri}}),
+                        )
+                        .unwrap_or(Value::Null)
+                } else {
+                    Value::Null
+                };
+                trees.insert(uri.clone(), tree);
+            }
+            if let Some(tree) = trees.get(&uri) {
+                if let Some(name) = selector::containing_symbol(tree, line) {
+                    if let Some(o) = item.as_object_mut() {
+                        o.insert("in_symbol".into(), json!(name));
+                    }
+                }
+            }
+        }
+        out.push(item);
+    }
+    Value::Array(out)
+}
+
+/// Reverse `path_to_uri`'s percent-encoding.
+fn percent_decode(s: &str) -> String {
+    let b = s.as_bytes();
+    let mut out = Vec::with_capacity(b.len());
+    let mut i = 0;
+    while i < b.len() {
+        if b[i] == b'%' && i + 2 < b.len() {
+            if let Ok(v) = u8::from_str_radix(&s[i + 1..i + 3], 16) {
+                out.push(v);
+                i += 3;
+                continue;
+            }
+        }
+        out.push(b[i]);
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
 }
 
 /// LSP's own "not ready, ask again" codes: ContentModified (-32801) and
@@ -275,7 +375,7 @@ mod tests {
 
     #[test]
     fn unknown_extension_is_rejected_before_spawning() {
-        let err = run(Kind::Symbols, "Cargo.toml", 1, 1).unwrap_err();
+        let err = run(Kind::Symbols, "Cargo.toml", Selector::Whole).unwrap_err();
         assert!(err.contains("no language server"), "got: {err}");
     }
 }

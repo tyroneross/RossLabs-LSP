@@ -12,6 +12,7 @@ mod daemon;
 mod lsp;
 mod mcp;
 mod query;
+mod selector;
 mod registry;
 
 use query::Kind;
@@ -69,34 +70,18 @@ fn run(args: &[String]) -> Result<String, String> {
         verb => {
             let kind =
                 Kind::parse(verb).ok_or_else(|| format!("unknown query '{verb}' (try --help)"))?;
-            let target = args.get(1).ok_or("missing <file>[:line:column]")?;
-            let (file, line, col) = split_target(target)?;
-            if kind.needs_position() && (line, col) == (0, 0) {
-                return Err(format!("{verb} needs a position, e.g. {file}:42:11"));
+            let target = args.get(1).ok_or("missing <file>[::symbol | :line:col]")?;
+            let (file, sel) = selector::Selector::parse(target);
+            if kind.needs_position() && !sel.is_point() {
+                return Err(format!(
+                    "{verb} needs a symbol or position, e.g. {file}::my_function or {file}:42:11"
+                ));
             }
-            let (line, col) = if (line, col) == (0, 0) {
-                (1, 1)
-            } else {
-                (line, col)
-            };
-            pretty(&query::run(kind, &file, line, col)?)
+            pretty(&query::run(kind, &file, sel)?)
         }
     }
 }
 
-/// Split `path/to/file.rs:42:11` into its parts.
-///
-/// Splits from the right so absolute Windows-style or colon-bearing paths do
-/// not lose their prefix, and returns (0, 0) when no position was supplied.
-fn split_target(target: &str) -> Result<(String, usize, usize), String> {
-    let parts: Vec<&str> = target.rsplitn(3, ':').collect();
-    if parts.len() == 3 {
-        if let (Ok(c), Ok(l)) = (parts[0].parse::<usize>(), parts[1].parse::<usize>()) {
-            return Ok((parts[2].to_string(), l, c));
-        }
-    }
-    Ok((target.to_string(), 0, 0))
-}
 
 fn pretty(v: &serde_json::Value) -> Result<String, String> {
     serde_json::to_string_pretty(v).map_err(|e| e.to_string())
@@ -106,24 +91,8 @@ fn pretty(v: &serde_json::Value) -> Result<String, String> {
 mod tests {
     use super::*;
 
-    #[test]
-    fn parses_file_line_column() {
-        let (f, l, c) = split_target("src/x.rs:42:11").unwrap();
-        assert_eq!((f.as_str(), l, c), ("src/x.rs", 42, 11));
-    }
 
-    #[test]
-    fn bare_path_has_no_position() {
-        let (f, l, c) = split_target("src/x.rs").unwrap();
-        assert_eq!((f.as_str(), l, c), ("src/x.rs", 0, 0));
-    }
 
-    #[test]
-    fn non_numeric_suffix_is_part_of_the_path() {
-        // A path containing colons must not be mistaken for a position.
-        let (f, l, c) = split_target("weird:name.rs").unwrap();
-        assert_eq!((f.as_str(), l, c), ("weird:name.rs", 0, 0));
-    }
 
     #[test]
     fn help_and_version_do_not_error() {
@@ -134,7 +103,7 @@ mod tests {
     #[test]
     fn point_query_without_position_is_rejected() {
         let err = run(&["def".into(), "src/main.rs".into()]).unwrap_err();
-        assert!(err.contains("needs a position"), "got: {err}");
+        assert!(err.contains("needs a symbol or position"), "got: {err}");
     }
 
     #[test]
