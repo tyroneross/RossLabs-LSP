@@ -139,7 +139,10 @@ its own is not enough.
 For an Obsidian-style UI cross-path check, run `code-intel ui path/to/main.js`.
 It maps static `dpl-*` source classes to the sibling `styles.css` and reports
 icon calls, pseudo-element graphics, literal text nodes, and accessible labels.
-It is evidence for wiring, not a substitute for a rendered layout check.
+When an IBR evidence packet is present, it also reports whether its source hashes
+are current and whether its raw scanner verdicts require screenshot review. It
+is evidence for wiring and render-review status, not a substitute for a rendered
+layout check.
 
 ## Design notes
 

@@ -11,6 +11,7 @@ repository = "https://github.com/tyroneross/RossLabs-AI-Toolkit"
 [dependencies]
 serde_json = "1"
 libc = "0.2"
+sha2 = "0.10"
 
 [profile.release]
 strip = true
