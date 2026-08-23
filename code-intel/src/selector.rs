@@ -197,8 +197,14 @@ fn collect_spans(node: &Value, prefix: &[String], out: &mut Vec<(String, usize, 
                 .get("range")
                 .or_else(|| o.get("location").and_then(|l| l.get("range")));
             if let Some(r) = range {
-                let s = r.get("start").and_then(|v| v.get("line")).and_then(|v| v.as_u64());
-                let e = r.get("end").and_then(|v| v.get("line")).and_then(|v| v.as_u64());
+                let s = r
+                    .get("start")
+                    .and_then(|v| v.get("line"))
+                    .and_then(|v| v.as_u64());
+                let e = r
+                    .get("end")
+                    .and_then(|v| v.get("line"))
+                    .and_then(|v| v.as_u64());
                 if let (Some(s), Some(e)) = (s, e) {
                     out.push((path.join("/"), s as usize, e as usize));
                 }
@@ -235,12 +241,28 @@ mod tests {
 
     #[test]
     fn parses_all_three_addressing_forms() {
-        assert_eq!(Selector::parse("a.rs::foo"),
-                   ("a.rs".into(), Selector::Symbol { path: vec!["foo".into()] }));
-        assert_eq!(Selector::parse("a.rs::Outer/inner"),
-                   ("a.rs".into(), Selector::Symbol { path: vec!["Outer".into(), "inner".into()] }));
-        assert_eq!(Selector::parse("a.rs:42:11"),
-                   ("a.rs".into(), Selector::Position { line: 42, col: 11 }));
+        assert_eq!(
+            Selector::parse("a.rs::foo"),
+            (
+                "a.rs".into(),
+                Selector::Symbol {
+                    path: vec!["foo".into()]
+                }
+            )
+        );
+        assert_eq!(
+            Selector::parse("a.rs::Outer/inner"),
+            (
+                "a.rs".into(),
+                Selector::Symbol {
+                    path: vec!["Outer".into(), "inner".into()]
+                }
+            )
+        );
+        assert_eq!(
+            Selector::parse("a.rs:42:11"),
+            ("a.rs".into(), Selector::Position { line: 42, col: 11 })
+        );
         assert_eq!(Selector::parse("a.rs"), ("a.rs".into(), Selector::Whole));
     }
 
@@ -265,7 +287,10 @@ mod tests {
     fn ambiguity_is_an_error_listing_candidates_not_a_guess() {
         let err = resolve_symbol(&tree(), &["dupe".into()]).unwrap_err();
         assert!(err.contains("ambiguous"), "got: {err}");
-        assert!(err.contains("line 13") && err.contains("line 43"), "got: {err}");
+        assert!(
+            err.contains("line 13") && err.contains("line 43"),
+            "got: {err}"
+        );
     }
 
     #[test]
@@ -283,7 +308,10 @@ mod tests {
 
     #[test]
     fn containing_symbol_picks_the_innermost_span() {
-        assert_eq!(containing_symbol(&tree(), 6).as_deref(), Some("Outer/inner"));
+        assert_eq!(
+            containing_symbol(&tree(), 6).as_deref(),
+            Some("Outer/inner")
+        );
         assert_eq!(containing_symbol(&tree(), 2).as_deref(), Some("Outer"));
         assert_eq!(containing_symbol(&tree(), 99), None);
     }
