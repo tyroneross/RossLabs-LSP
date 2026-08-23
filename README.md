@@ -28,9 +28,27 @@ vendor-neutral path everywhere else. Same servers underneath.
 
 ```bash
 cd code-intel && cargo install --path .
-code-intel doctor                      # which language servers are present
-code-intel refs src/query.rs:51:8      # every caller of a symbol
+code-intel doctor                          # which language servers are present
+code-intel refs src/query.rs::workspace_root   # every caller of a symbol
 ```
+
+**Address symbols by name, not by line.** `file.rs:42:11` breaks the moment
+anything above line 42 moves, and it breaks *silently* — the query resolves to
+whatever now occupies that position. Verified here: insert 20 lines above a
+symbol and the line-addressed query returns 0 hits with no error, while
+`file.rs::for_path` still returns all 7. Line addressing still works when you
+want an exact point.
+
+Answers name the symbol containing each hit, because a line number is not
+something you can act on:
+
+```json
+{"at": "src/registry.rs:107", "in": "tests/maps_extension_to_server"}
+```
+
+An ambiguous name is refused with its candidates rather than resolved to the
+first match, and a name that does not exist lists what the file actually has.
+Pass `--raw` for untouched LSP payloads.
 
 Optionally keep slow servers warm:
 
@@ -41,7 +59,9 @@ code-intel daemon &                    # pools rust-analyzer, sourcekit-lsp
 Measured here, repeated `refs` against a Rust workspace: **4.2s without the daemon,
 0.05s with it**. Fast servers like `ty` (0.06s) are never pooled — they bypass the
 daemon rather than pay a socket round-trip. The daemon is optional: if it is not
-running, the CLI spawns directly and returns the same answer.
+running, the CLI spawns directly and returns the same answer. MCP mode starts one
+itself, since a long-lived session that spawns a server per query costs 3.5s
+instead of 0.02s.
 
 Register it as an MCP server — Codex CLI, `~/.codex/config.toml`:
 

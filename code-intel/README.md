@@ -35,15 +35,61 @@ code-intel doctor          # which language servers are present
 Works in anything that can run a command — an agent, a git hook, CI, a shell script.
 
 ```bash
-code-intel def     src/query.rs:88:18    # where is this defined
-code-intel refs    src/query.rs:51:8     # every caller
-code-intel hover   src/query.rs:51:8     # inferred type + docs
-code-intel symbols scripts/build.py      # outline a file
-code-intel diag    scripts/build.py      # type + compile errors
-code-intel doctor                        # server coverage
+code-intel def     src/query.rs::workspace_root   # where is this defined
+code-intel refs    src/query.rs::workspace_root   # every caller
+code-intel hover   src/query.rs::workspace_root   # inferred type + docs
+code-intel symbols scripts/build.py               # outline a file
+code-intel diag    scripts/build.py               # type + compile errors
+code-intel doctor                                 # server coverage
 ```
 
 JSON on stdout, errors on stderr, non-zero exit on failure.
+
+## Addressing
+
+Three forms, and the first is the one to reach for:
+
+| Form | Meaning |
+|---|---|
+| `file.rs::symbol` | by name — survives edits above it |
+| `file.rs::Type/method` | qualified, for nested or repeated names |
+| `file.rs:42:11` | exact position, 1-based |
+
+`file.rs:42:11` breaks the moment anything above line 42 moves, and it breaks
+*silently*: the position now holds a different symbol, so the query returns a
+confident wrong answer. Measured here — insert 20 lines above a symbol:
+
+| Address | Result |
+|---|---|
+| `::for_path` | 7 references, correct |
+| `:69:10` | **0 references, no error** |
+
+An ambiguous name is an error listing the candidates, never a guess:
+
+```
+'dupe' is ambiguous — 2 matches: Outer/dupe (line 13), Other/dupe (line 43).
+Qualify it, e.g. file::Parent/dupe
+```
+
+## Output
+
+Compact by default. Every hit is the path, the line, and the symbol that
+contains it:
+
+```json
+{"at": "src/registry.rs:107", "in": "tests/maps_extension_to_server"}
+```
+
+The containing symbol is the point. `registry.rs:107` says where;
+`tests/maps_extension_to_server` says what, which is what a caller acts on.
+
+Measured on this repo across 7 real symbols, against `grep` answering the same
+question: raw LSP payloads cost **3.03x** grep's tokens, compact costs **1.04x**.
+On the ambiguous names where the tool earns its place, it is cheaper *and*
+right — symbol `which`: grep 326 tokens for 15 hits of which 13 are wrong,
+against 97 tokens for 2 hits that are both correct.
+
+Pass `--raw` for untouched LSP payloads.
 
 ## Use it as an MCP server
 
@@ -66,7 +112,10 @@ args = ["mcp"]
 MCP_IDLE_TIMEOUT_MS = "1800000"
 ```
 
-Tools: `def`, `refs`, `hover`, `symbols`, `diag`, `doctor`.
+Tools: `def`, `refs`, `hover`, `symbols`, `diag`, `doctor`. They take a
+`symbol` argument in preference to `line`/`column`, for the same durability
+reason. MCP mode starts a daemon itself — without a warm pool every query
+spawns its own language server, measured at 3.5s against 0.02s.
 
 ## Language coverage
 
@@ -125,7 +174,8 @@ is absent or stale, the CLI spawns directly and still answers.
 
 ## Status
 
-v0.2.
+v0.2. Five languages, covering the author's codebase; adding one is a registry
+entry plus an installed server. Read-only — no rename or refactor.
 
 ## License
 
