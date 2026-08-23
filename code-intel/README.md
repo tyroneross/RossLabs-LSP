@@ -124,10 +124,22 @@ spawns its own language server, measured at 3.5s against 0.02s.
 | Python | `ty` | `uv tool install ty` |
 | Rust | `rust-analyzer` | `brew install rust-analyzer` |
 | Swift | `sourcekit-lsp` | ships with Xcode |
-| TypeScript / JS | `typescript-language-server` | `npm i -g typescript-language-server typescript` |
+| TypeScript / JS | `typescript-language-server` + TypeScript with `lib/tsserver.js` | `npm i -g typescript-language-server typescript@5` |
 | C / C++ / ObjC | `clangd` | ships with Xcode / llvm |
 
 `code-intel doctor` reports which are actually installed.
+
+For JavaScript and TypeScript, `code-intel` keeps a workspace's compiler as the
+first choice and discovers a sibling global TypeScript install as the
+`tsserver.fallbackPath`. Set `CODE_INTEL_TSSERVER_PATH` to an explicit
+`lib/tsserver.js` file when the compiler lives elsewhere. `doctor` reports
+whether that fallback is ready; an executable `typescript-language-server` on
+its own is not enough.
+
+For an Obsidian-style UI cross-path check, run `code-intel ui path/to/main.js`.
+It maps static `dpl-*` source classes to the sibling `styles.css` and reports
+icon calls, pseudo-element graphics, literal text nodes, and accessible labels.
+It is evidence for wiring, not a substitute for a rendered layout check.
 
 ## Design notes
 

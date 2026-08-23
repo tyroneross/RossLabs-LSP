@@ -11,6 +11,7 @@ use crate::daemon;
 use crate::lsp::{self, Client};
 use crate::registry;
 use crate::selector::{self, Selector};
+use crate::ui;
 use serde_json::{json, Value};
 use std::time::Duration;
 
@@ -27,6 +28,7 @@ pub enum Kind {
     Hover,
     Symbols,
     Diagnostics,
+    Ui,
 }
 
 impl Kind {
@@ -37,6 +39,7 @@ impl Kind {
             "hover" => Kind::Hover,
             "symbols" => Kind::Symbols,
             "diag" | "diagnostics" => Kind::Diagnostics,
+            "ui" | "ui-contract" => Kind::Ui,
             _ => return None,
         })
     }
@@ -87,6 +90,15 @@ pub fn run(kind: Kind, file: &str, sel: Selector, raw: bool) -> Result<Value, St
         .to_string_lossy()
         .into_owned();
 
+    if kind == Kind::Ui {
+        return Ok(json!({
+            "file": abs,
+            "query": "ui",
+            "ready": true,
+            "result": ui::inspect(&abs)?,
+        }));
+    }
+
     let server = registry::for_path(&abs)
         .ok_or_else(|| format!("no language server registered for {abs}"))?;
     if !registry::is_installed(server) {
@@ -117,7 +129,7 @@ pub(crate) fn run_with_client(
     client: &mut Client,
     raw: bool,
 ) -> Result<Value, String> {
-    let uri = client.open(&abs, server.language_id)?;
+    let uri = client.open(abs, server.language_id)?;
 
     // Whether the server produced a usable answer rather than an early empty.
     let mut ready = true;
@@ -372,18 +384,32 @@ pub fn doctor() -> Value {
         .iter()
         .map(|s| {
             let path = registry::which(s.command);
+            let installed = path.is_some();
+            let fallback = (s.language_id == "typescript")
+                .then(registry::typescript_fallback_path)
+                .flatten();
+            let ready = installed && (s.language_id != "typescript" || fallback.is_some());
             json!({
                 "language": s.language_id,
                 "command": s.command,
                 "extensions": s.extensions,
-                "installed": path.is_some(),
+                "installed": installed,
+                "ready": ready,
                 "path": path.map(|p| p.to_string_lossy().into_owned()),
                 "install": s.install,
+                "runtime": if s.language_id == "typescript" {
+                    json!({
+                        "fallback_path": fallback.as_ref().map(|p| p.to_string_lossy().into_owned()),
+                        "fallback_ready": fallback.is_some(),
+                        "hint": registry::typescript_setup_hint(),
+                    })
+                } else { Value::Null },
             })
         })
         .collect();
     let installed = servers.iter().filter(|s| s["installed"] == true).count();
-    json!({"installed": installed, "total": servers.len(), "servers": servers})
+    let ready = servers.iter().filter(|s| s["ready"] == true).count();
+    json!({"installed": installed, "ready": ready, "total": servers.len(), "servers": servers})
 }
 
 #[cfg(test)]
@@ -420,6 +446,11 @@ mod tests {
             .unwrap()
             .iter()
             .all(|s| s["command"].is_string()));
+        assert!(d["servers"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|s| s["ready"].is_boolean()));
     }
 
     #[test]

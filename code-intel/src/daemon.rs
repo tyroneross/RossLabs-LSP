@@ -9,8 +9,8 @@
 
 use crate::lsp::Client;
 use crate::query::{self, Kind};
-use crate::selector::Selector;
 use crate::registry::{self, Server};
+use crate::selector::Selector;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Write};
@@ -217,7 +217,10 @@ fn request_to_query(
         None => Selector::Whole,
     };
     let raw = request.get("raw").and_then(Value::as_bool).unwrap_or(false);
-    let peer = request.get("protocol").and_then(Value::as_str).unwrap_or("");
+    let peer = request
+        .get("protocol")
+        .and_then(Value::as_str)
+        .unwrap_or("");
     if peer != env!("CARGO_PKG_VERSION") {
         return Err(format!(
             "daemon is version {} but the client is {peer}; restart the daemon",
@@ -343,6 +346,7 @@ impl Kind {
             Kind::Hover => "hover",
             Kind::Symbols => "symbols",
             Kind::Diagnostics => "diag",
+            Kind::Ui => "ui",
         }
     }
 }

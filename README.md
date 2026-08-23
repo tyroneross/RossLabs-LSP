@@ -88,7 +88,7 @@ MCP_IDLE_TIMEOUT_MS = "1800000"
 | Python | `ty` | `uv tool install ty` |
 | Rust | `rust-analyzer` | `brew install rust-analyzer` |
 | Swift | `sourcekit-lsp` | ships with Xcode |
-| TypeScript / JS | `typescript-language-server` | `npm i -g typescript-language-server typescript` |
+| TypeScript / JS | `typescript-language-server` + TypeScript with `lib/tsserver.js` | `npm i -g typescript-language-server typescript@5` |
 | C / C++ / ObjC | `clangd` | ships with Xcode / llvm |
 
 ## License

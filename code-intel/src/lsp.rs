@@ -9,7 +9,7 @@
 //! that always reaps its child cannot accumulate the orphaned `SourceKitService`
 //! population documented in easy-terminal/docs/lsp-memory-rca.md.
 
-use crate::registry::Server;
+use crate::registry::{self, Server};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read, Write};
@@ -125,20 +125,31 @@ impl Client {
             pooled,
         };
 
-        let init = c.request(
-            "initialize",
-            json!({
-                "processId": std::process::id(),
-                "rootUri": path_to_uri(root),
-                "capabilities": {
-                    "textDocument": {
-                        "documentSymbol": { "hierarchicalDocumentSymbolSupport": true },
-                        "publishDiagnostics": {},
-                        "definition": {}, "references": {}, "hover": {}
+        let init = c
+            .request(
+                "initialize",
+                json!({
+                    "processId": std::process::id(),
+                    "rootUri": path_to_uri(root),
+                    "initializationOptions": registry::initialization_options(server),
+                    "capabilities": {
+                        "textDocument": {
+                            "documentSymbol": { "hierarchicalDocumentSymbolSupport": true },
+                            "publishDiagnostics": {},
+                            "definition": {}, "references": {}, "hover": {}
+                        }
                     }
+                }),
+            )
+            .map_err(|error| {
+                if server.language_id == "typescript"
+                    && error.contains("Could not find a valid TypeScript installation")
+                {
+                    format!("{error} {}", registry::typescript_setup_hint())
+                } else {
+                    error
                 }
-            }),
-        )?;
+            })?;
         c.notify("initialized", json!({}))?;
         let _ = init;
         Ok(c)

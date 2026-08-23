@@ -12,8 +12,9 @@ mod daemon;
 mod lsp;
 mod mcp;
 mod query;
-mod selector;
 mod registry;
+mod selector;
+mod ui;
 
 use query::Kind;
 
@@ -35,6 +36,7 @@ QUERIES
   hover     inferred type and docs at a position
   symbols   outline of a whole file
   diag      diagnostics for a whole file
+  ui        static JavaScript-to-CSS, icon, text, and accessibility contract
 
 EXAMPLES
   code-intel def src/query.rs:42:11
@@ -86,7 +88,6 @@ fn run(args: &[String]) -> Result<String, String> {
     }
 }
 
-
 fn pretty(v: &serde_json::Value) -> Result<String, String> {
     serde_json::to_string_pretty(v).map_err(|e| e.to_string())
 }
@@ -94,9 +95,6 @@ fn pretty(v: &serde_json::Value) -> Result<String, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-
-
 
     #[test]
     fn help_and_version_do_not_error() {

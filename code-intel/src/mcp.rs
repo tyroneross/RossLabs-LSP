@@ -70,10 +70,7 @@ pub fn serve() -> ! {
 fn handle(req: &Value) -> Option<Value> {
     let id = req.get("id").cloned();
     let method = req.get("method").and_then(|v| v.as_str()).unwrap_or("");
-    if id.is_none() {
-        return None; // notification (e.g. notifications/initialized)
-    }
-    let id = id.unwrap();
+    let id = id?; // notification (e.g. notifications/initialized)
 
     let result = match method {
         "initialize" => Ok(json!({
@@ -112,7 +109,11 @@ fn call_tool(params: &Value) -> Result<Value, String> {
     // call and the file being read. line/col stays for exact positions.
     let sel = match args.get("symbol").and_then(|v| v.as_str()) {
         Some(sym) if !sym.is_empty() => Selector::Symbol {
-            path: sym.split('/').filter(|s| !s.is_empty()).map(str::to_string).collect(),
+            path: sym
+                .split('/')
+                .filter(|s| !s.is_empty())
+                .map(str::to_string)
+                .collect(),
         },
         _ => {
             let line = args.get("line").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
@@ -174,6 +175,7 @@ fn tool_list() -> Vec<Value> {
         point("hover", "Inferred type and documentation for the symbol at a position."),
         whole("symbols", "Outline every top-level symbol in a file."),
         whole("diag", "Type and compile diagnostics for a file."),
+        whole("ui", "Map dpl-* source classes to sibling CSS and report icon, text, and accessibility surfaces."),
         json!({
             "name": "doctor",
             "description": "Report which language servers are registered and installed.",
