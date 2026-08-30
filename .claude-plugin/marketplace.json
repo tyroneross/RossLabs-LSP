@@ -11,7 +11,7 @@
   "plugins": [
     {
       "name": "ty-lsp",
-      "description": "Python language server (ty, by Astral) for code intelligence and type checking",
+      "description": "Registers ty (Astral) as Claude Code's Python language server: definitions, references, hover, call hierarchy. Requires `ty` on PATH (`uv tool install ty`). Python only -- Claude's built-in LSP tool answers incompletely on unregistered languages, so use code-intel for anything else.",
       "source": "./plugins/ty-lsp",
       "category": "development"
     }

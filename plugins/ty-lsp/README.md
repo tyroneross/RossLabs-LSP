@@ -14,6 +14,35 @@ is required for the server itself.
 
 `.py`, `.pyi`
 
+## Scope — and what it does to other languages
+
+This plugin registers **Python only**. That is worth stating loudly, because
+installing it changes how the host behaves on languages it does not cover.
+
+Once any `lspServers` plugin is installed, Claude Code has a working `LSP` tool, so
+an agent will reach for it. On a file whose language has no registered server the
+tool does not error and does not say "no server" — it returns a confident,
+incomplete answer. Verified with only `ty` registered: `findReferences` on an
+exported TypeScript function returned **1 hit, the declaration**, where
+`code-intel refs` returned **4**, including both real importers. Declaration-only
+is the signature; it looks exactly like "no callers."
+
+So: use this plugin for Python, and reach for
+[`code-intel`](../../code-intel/) for everything else — it covers Python,
+TypeScript, Rust, Swift, and C from one binary, and every answer carries a
+`"ready"` boolean so an unready result reads as UNKNOWN rather than empty.
+
+```bash
+code-intel doctor                        # per-language readiness
+code-intel refs path/to/file.ts::mySymbol
+```
+
+One caveat on `doctor`: it answers **globally**, while some servers resolve their
+toolchain **per workspace**. `typescript-language-server` finds `typescript` in a
+project's `node_modules`, so `doctor` can report TypeScript NOT READY on a machine
+where queries inside a real project succeed. Trust the `"ready"` field on the query
+you actually ran, not `doctor`, when the two disagree.
+
 ## Capabilities
 
 Advertised by `ty server` on initialize:

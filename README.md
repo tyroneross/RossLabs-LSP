@@ -24,6 +24,22 @@ client whatsoever.
 So the plugin is the fast path where a host supports it, and `code-intel` is the
 vendor-neutral path everywhere else. Same servers underneath.
 
+**A single-language plugin makes the host's built-in LSP tool wrong on every other
+language, silently.** Installing `ty-lsp` gives Claude Code a `LSP` tool that works
+— for Python. Point it at TypeScript, Rust, Swift, or C and it does not error and
+does not report "no server": it answers from nothing and returns a confident,
+incomplete result. Verified here: with only `ty` registered, `findReferences` on an
+exported TypeScript function returned **1 hit — the declaration** — while
+`code-intel refs` on the same symbol returned **4**, including both real importers.
+A declaration-only result is the signature of this failure, and it is
+indistinguishable from an honest "this symbol has no callers."
+
+The rule that follows: **install the plugin for the fast path, but route
+cross-file symbol questions through `code-intel` unless you have confirmed a
+server is registered for that language.** `code-intel` reports `"ready"` on every
+answer, so an unready result reads as UNKNOWN rather than empty. The built-in tool
+carries no such signal.
+
 ## Quick start
 
 ```bash
