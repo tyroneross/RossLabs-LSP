@@ -55,7 +55,7 @@ pub const SERVERS: &[Server] = &[
         command: "typescript-language-server",
         args: &["--stdio"],
         extensions: &[".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"],
-        install: "npm i -g typescript-language-server typescript@5",
+        install: "npm i -g typescript-language-server typescript@6",
         measured_cold_start: None,
     },
     Server {
@@ -106,14 +106,16 @@ pub fn initialization_options(server: &Server) -> Value {
 /// A human-actionable explanation for the one adapter with a second runtime
 /// dependency. `typescript-language-server` alone is not sufficient.
 pub fn typescript_setup_hint() -> &'static str {
-    "Install a TypeScript release that contains lib/tsserver.js, add it to the workspace, or set CODE_INTEL_TSSERVER_PATH to that file."
+    "Install a TypeScript release that contains lib/tsserver.js, add it to the workspace, or set ROSSLABS_LSP_TSSERVER_PATH to that file."
 }
 
 /// Find an explicit compiler first, then the TypeScript package installed
 /// beside the language-server executable. This supports npm's normal global
 /// layout without invoking npm or mutating the workspace.
 pub fn typescript_fallback_path() -> Option<PathBuf> {
-    if let Some(value) = std::env::var_os("CODE_INTEL_TSSERVER_PATH") {
+    if let Some(value) = std::env::var_os("ROSSLABS_LSP_TSSERVER_PATH")
+        .or_else(|| std::env::var_os("CODE_INTEL_TSSERVER_PATH"))
+    {
         if let Some(path) = normalize_tsserver_path(Path::new(&value)) {
             return Some(path);
         }

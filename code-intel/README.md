@@ -2,12 +2,12 @@
 SPDX-FileCopyrightText: 2026 Tyrone Ross, Jr <46267523+tyroneross@users.noreply.github.com>
 SPDX-License-Identifier: Apache-2.0
 -->
-# code-intel
+# RossLabs LSP
 
-Compiler-grade code intelligence for **any** LLM agent. One binary, two surfaces,
-no vendor lock.
+Compiler-grade code intelligence for **any** LLM agent. One implementation, two
+compatible commands, two surfaces, no vendor lock.
 
-`grep "save"` returns 200 lines. `code-intel refs foo.py:42:11` returns the 6 places
+`grep "save"` returns 200 lines. `rosslabs-lsp refs foo.py:42:11` returns the 6 places
 that call *that* function. The difference is semantic vs textual, and it is the
 difference between an agent that renames safely and one that misses three call sites.
 
@@ -20,27 +20,30 @@ But the wiring is per-host and non-portable:
 - **Codex CLI** has no native LSP at all ([openai/codex#8745](https://github.com/openai/codex/issues/8745), [#14799](https://github.com/openai/codex/issues/14799))
 - **Local models and scripts** have no LSP client whatsoever
 
-`code-intel` is the vendor-neutral layer under all of them. The server does the
+RossLabs LSP is the vendor-neutral layer under all of them. The server does the
 thinking; this owns the client, and exposes it two ways.
 
 ## Install
 
 ```bash
-cargo install --path .
-code-intel doctor          # which language servers are present
+cargo install --path . --locked --force
+rosslabs-lsp doctor        # which language servers are present
 ```
+
+`--force` lets Cargo transfer the legacy `code-intel` executable from the old
+package name to RossLabs LSP. It is safe for a fresh install too.
 
 ## Use it as a CLI
 
 Works in anything that can run a command — an agent, a git hook, CI, a shell script.
 
 ```bash
-code-intel def     src/query.rs::workspace_root   # where is this defined
-code-intel refs    src/query.rs::workspace_root   # every caller
-code-intel hover   src/query.rs::workspace_root   # inferred type + docs
-code-intel symbols scripts/build.py               # outline a file
-code-intel diag    scripts/build.py               # type + compile errors
-code-intel doctor                                 # server coverage
+rosslabs-lsp def     src/query.rs::workspace_root   # where is this defined
+rosslabs-lsp refs    src/query.rs::workspace_root   # every caller
+rosslabs-lsp hover   src/query.rs::workspace_root   # inferred type + docs
+rosslabs-lsp symbols scripts/build.py               # outline a file
+rosslabs-lsp diag    scripts/build.py               # type + compile errors
+rosslabs-lsp doctor                                 # server coverage
 ```
 
 JSON on stdout, errors on stderr, non-zero exit on failure.
@@ -98,17 +101,17 @@ Same queries, exposed as tools, for any MCP-capable host.
 Claude Code — `.mcp.json` or plugin manifest:
 
 ```json
-{ "mcpServers": { "code-intel": { "command": "code-intel", "args": ["mcp"] } } }
+{ "mcpServers": { "rosslabs-lsp": { "command": "rosslabs-lsp", "args": ["mcp"] } } }
 ```
 
 Codex CLI — `~/.codex/config.toml`:
 
 ```toml
-[mcp_servers.code-intel]
-command = "code-intel"
+[mcp_servers.rosslabs-lsp]
+command = "rosslabs-lsp"
 args = ["mcp"]
 
-[mcp_servers.code-intel.env]
+[mcp_servers.rosslabs-lsp.env]
 MCP_IDLE_TIMEOUT_MS = "1800000"
 ```
 
@@ -124,19 +127,20 @@ spawns its own language server, measured at 3.5s against 0.02s.
 | Python | `ty` | `uv tool install ty` |
 | Rust | `rust-analyzer` | `brew install rust-analyzer` |
 | Swift | `sourcekit-lsp` | ships with Xcode |
-| TypeScript / JS | `typescript-language-server` + TypeScript with `lib/tsserver.js` | `npm i -g typescript-language-server typescript@5` |
+| TypeScript / JS | `typescript-language-server` + TypeScript with `lib/tsserver.js` | `npm i -g typescript-language-server typescript@6` |
 | C / C++ / ObjC | `clangd` | ships with Xcode / llvm |
 
-`code-intel doctor` reports which are actually installed.
+`rosslabs-lsp doctor` reports which are actually installed.
 
-For JavaScript and TypeScript, `code-intel` keeps a workspace's compiler as the
+For JavaScript and TypeScript, RossLabs LSP keeps a workspace's compiler as the
 first choice and discovers a sibling global TypeScript install as the
-`tsserver.fallbackPath`. Set `CODE_INTEL_TSSERVER_PATH` to an explicit
-`lib/tsserver.js` file when the compiler lives elsewhere. `doctor` reports
+`tsserver.fallbackPath`. Set `ROSSLABS_LSP_TSSERVER_PATH` to an explicit
+`lib/tsserver.js` file when the compiler lives elsewhere. The legacy
+`CODE_INTEL_TSSERVER_PATH` name remains supported. `doctor` reports
 whether that fallback is ready; an executable `typescript-language-server` on
 its own is not enough.
 
-For an Obsidian-style UI cross-path check, run `code-intel ui path/to/main.js`.
+For an Obsidian-style UI cross-path check, run `rosslabs-lsp ui path/to/main.js`.
 It maps static `dpl-*` source classes to the sibling `styles.css` and reports
 icon calls, pseudo-element graphics, literal text nodes, and accessible labels.
 When an IBR evidence packet is present, it also reports whether its source hashes
@@ -171,7 +175,7 @@ that spec's own `conformance.mjs`.
 
 ## The daemon
 
-`code-intel daemon` keeps eligible language servers warm on a Unix socket. Measured
+`rosslabs-lsp daemon` keeps eligible language servers warm on a Unix socket. Measured
 on this host, repeated `refs` against a Rust workspace:
 
 | | first query | repeat |
@@ -189,8 +193,15 @@ is absent or stale, the CLI spawns directly and still answers.
 
 ## Status
 
-v0.2. Five languages, covering the author's codebase; adding one is a registry
+Five languages, covering the author's codebase; adding one is a registry
 entry plus an installed server. Read-only — no rename or refactor.
+
+## Compatibility
+
+`code-intel` remains installed as a command alias. Existing scripts, the
+`CODE_INTEL_TSSERVER_PATH` variable, and `CODE_INTEL_SOCKET` continue to work.
+New integrations should use `rosslabs-lsp`, `ROSSLABS_LSP_TSSERVER_PATH`, and
+`ROSSLABS_LSP_SOCKET`.
 
 ## License
 

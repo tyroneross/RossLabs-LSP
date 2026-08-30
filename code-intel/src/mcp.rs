@@ -76,7 +76,7 @@ fn handle(req: &Value) -> Option<Value> {
         "initialize" => Ok(json!({
             "protocolVersion": PROTOCOL_VERSION,
             "capabilities": {"tools": {}},
-            "serverInfo": {"name": "code-intel", "version": env!("CARGO_PKG_VERSION")}
+            "serverInfo": {"name": "rosslabs-lsp", "version": env!("CARGO_PKG_VERSION")}
         })),
         "tools/list" => Ok(json!({"tools": tool_list()})),
         "tools/call" => call_tool(req.get("params").unwrap_or(&Value::Null)),
@@ -238,7 +238,7 @@ mod tests {
     #[test]
     fn initialize_reports_tools_capability() {
         let r = handle(&json!({"jsonrpc":"2.0","id":1,"method":"initialize"})).unwrap();
-        assert_eq!(r["result"]["serverInfo"]["name"], "code-intel");
+        assert_eq!(r["result"]["serverInfo"]["name"], "rosslabs-lsp");
         assert!(r["result"]["capabilities"]["tools"].is_object());
     }
 

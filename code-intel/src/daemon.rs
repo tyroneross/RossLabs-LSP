@@ -148,7 +148,8 @@ pub fn try_run(
 }
 
 fn socket_path() -> PathBuf {
-    std::env::var_os("CODE_INTEL_SOCKET")
+    std::env::var_os("ROSSLABS_LSP_SOCKET")
+        .or_else(|| std::env::var_os("CODE_INTEL_SOCKET"))
         .map(PathBuf::from)
         .unwrap_or_else(|| {
             std::env::temp_dir().join(format!("code-intel-{}.sock", unsafe { libc::getuid() }))

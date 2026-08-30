@@ -1,6 +1,6 @@
 {
   "name": "ty-lsp",
-  "description": "Registers ty (Astral) as Claude Code's Python language server: definitions, references, hover, call hierarchy. Requires `ty` on PATH (`uv tool install ty`). Python only -- Claude's built-in LSP tool answers incompletely on unregistered languages, so use code-intel for anything else.",
+  "description": "Registers ty (Astral) as Claude Code's Python language server: definitions, references, hover, call hierarchy. Requires `ty` on PATH (`uv tool install ty`). Python only -- Claude's built-in LSP tool answers incompletely on unregistered languages, so use RossLabs LSP for anything else.",
   "version": "0.1.0",
   "author": {
     "name": "Tyrone Ross",

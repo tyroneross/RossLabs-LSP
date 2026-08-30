@@ -1,12 +1,20 @@
 [package]
-name = "code-intel"
+name = "rosslabs-lsp"
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.85"
-description = "Vendor-neutral code intelligence: one binary that fronts any LSP server as a CLI or an MCP tool"
+description = "RossLabs LSP: one implementation that fronts language servers as a CLI or an MCP tool"
 authors = ["Tyrone Ross, Jr <46267523+tyroneross@users.noreply.github.com>"]
 license = "Apache-2.0"
-repository = "https://github.com/tyroneross/RossLabs-AI-Toolkit"
+repository = "https://github.com/tyroneross/RossLabs-LSP"
+
+[[bin]]
+name = "rosslabs-lsp"
+path = "src/main.rs"
+
+[[bin]]
+name = "code-intel"
+path = "src/bin/code-intel.rs"
 
 [dependencies]
 serde_json = "1"
