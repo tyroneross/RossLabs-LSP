@@ -90,16 +90,22 @@ pub fn resolve_symbol(symbols: &Value, path: &[String]) -> Result<Value, String>
 
     let want = path.join("/");
     // Exact qualified match first; fall back to matching the final segment so
-    // `file::inner` works without naming every ancestor.
-    let mut matched: Vec<&(String, Value, usize)> =
-        hits.iter().filter(|(p, _, _)| *p == want).collect();
-    if matched.is_empty() {
-        let leaf = path.last().cloned().unwrap_or_default();
-        matched = hits
-            .iter()
-            .filter(|(p, _, _)| p.rsplit('/').next() == Some(leaf.as_str()))
-            .collect();
-    }
+    // `file::inner` works without naming every ancestor. Then retry both with
+    // signatures stripped: sourcekit-lsp names Swift functions with argument
+    // labels (`load(from:)`), so a bare `load` would otherwise never match.
+    // Overloads stay ambiguous; the full labeled name still matches exactly.
+    let leaf = path.last().cloned().unwrap_or_default();
+    let tiers: [&dyn Fn(&str) -> bool; 4] = [
+        &|p| p == want,
+        &|p| p.rsplit('/').next() == Some(leaf.as_str()),
+        &|p| same_base_path(p, path),
+        &|p| p.rsplit('/').next().map(base_name) == Some(base_name(&leaf)),
+    ];
+    let matched: Vec<&(String, Value, usize)> = tiers
+        .iter()
+        .map(|tier| hits.iter().filter(|(p, _, _)| tier(p)).collect::<Vec<_>>())
+        .find(|m| !m.is_empty())
+        .unwrap_or_default();
 
     match matched.len() {
         0 => Err(format!(
@@ -107,13 +113,14 @@ pub fn resolve_symbol(symbols: &Value, path: &[String]) -> Result<Value, String>
             if hits.is_empty() {
                 String::new()
             } else {
+                // A silently truncated list reads as "these are all the
+                // symbols" — say how many were left out.
+                let shown: Vec<&str> = hits.iter().map(|(p, _, _)| p.as_str()).take(FOUND_LIMIT).collect();
+                let more = hits.len().saturating_sub(FOUND_LIMIT);
                 format!(
-                    " (found: {})",
-                    hits.iter()
-                        .map(|(p, _, _)| p.as_str())
-                        .take(8)
-                        .collect::<Vec<_>>()
-                        .join(", ")
+                    " (found: {}{})",
+                    shown.join(", "),
+                    if more > 0 { format!(", … +{more} more") } else { String::new() }
                 )
             }
         )),
@@ -127,6 +134,19 @@ pub fn resolve_symbol(symbols: &Value, path: &[String]) -> Result<Value, String>
         }
         .message()),
     }
+}
+
+const FOUND_LIMIT: usize = 20;
+
+/// Identifier without a trailing signature: `load(from:)` → `load`.
+fn base_name(segment: &str) -> &str {
+    segment.split('(').next().unwrap_or(segment).trim()
+}
+
+fn same_base_path(qualified: &str, path: &[String]) -> bool {
+    let segments: Vec<&str> = qualified.split('/').collect();
+    segments.len() == path.len()
+        && segments.iter().zip(path).all(|(have, want)| base_name(have) == base_name(want))
 }
 
 /// Flatten a symbol tree into (qualified_path, position, line) triples.
@@ -304,6 +324,50 @@ mod tests {
         let err = resolve_symbol(&tree(), &["nope".into()]).unwrap_err();
         assert!(err.contains("no symbol named"), "got: {err}");
         assert!(err.contains("Outer"), "should list candidates: {err}");
+    }
+
+    fn swift_tree() -> Value {
+        json!([
+            {"name":"Loader","range":{"start":{"line":0},"end":{"line":20}},
+             "selectionRange":{"start":{"line":0,"character":7}},
+             "children":[
+                {"name":"load(from:)","range":{"start":{"line":2},"end":{"line":4}},
+                 "selectionRange":{"start":{"line":2,"character":9}}},
+                {"name":"save(_:to:)","range":{"start":{"line":6},"end":{"line":8}},
+                 "selectionRange":{"start":{"line":6,"character":9}}},
+                {"name":"save(_:)","range":{"start":{"line":10},"end":{"line":12}},
+                 "selectionRange":{"start":{"line":10,"character":9}}}
+             ]},
+            {"name":"responsibleApp(for:)","range":{"start":{"line":25},"end":{"line":30}},
+             "selectionRange":{"start":{"line":25,"character":5}}}
+        ])
+    }
+
+    #[test]
+    fn bare_name_matches_a_swift_labeled_function() {
+        assert_eq!(resolve_symbol(&swift_tree(), &["responsibleApp".into()]).unwrap()["line"], 25);
+        assert_eq!(resolve_symbol(&swift_tree(), &["load".into()]).unwrap()["line"], 2);
+        assert_eq!(
+            resolve_symbol(&swift_tree(), &["Loader".into(), "load".into()]).unwrap()["line"],
+            2
+        );
+    }
+
+    #[test]
+    fn swift_overloads_stay_ambiguous_and_labels_disambiguate() {
+        let err = resolve_symbol(&swift_tree(), &["save".into()]).unwrap_err();
+        assert!(err.contains("ambiguous"), "got: {err}");
+        let p = resolve_symbol(&swift_tree(), &["save(_:)".into()]).unwrap();
+        assert_eq!(p["line"], 10);
+    }
+
+    #[test]
+    fn missing_symbol_says_when_the_candidate_list_is_truncated() {
+        let many: Vec<Value> = (0..25)
+            .map(|i| json!({"name": format!("f{i}"), "selectionRange": {"start": {"line": i}}}))
+            .collect();
+        let err = resolve_symbol(&Value::Array(many), &["nope".into()]).unwrap_err();
+        assert!(err.contains("+5 more"), "got: {err}");
     }
 
     #[test]
