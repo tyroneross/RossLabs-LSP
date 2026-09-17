@@ -30,6 +30,13 @@ const SERVER_IDLE_TIMEOUT: Duration = Duration::from_secs(300);
 const SOCKET_TIMEOUT: Duration = Duration::from_secs(2);
 static DAEMON_RUNNING: AtomicBool = AtomicBool::new(true);
 
+/// Package version plus a source fingerprint (see build.rs). The version alone
+/// does not change between rebuilds, so it cannot detect a stale daemon.
+pub const BUILD_ID: &str = env!("ROSSLABS_LSP_BUILD_ID");
+/// Error prefix a daemon returns to a client from a different build, just
+/// before it exits so the next `ensure_running` starts the current binary.
+const STALE_BUILD: &str = "stale daemon build";
+
 pub fn is_poolable(server: &Server) -> bool {
     server
         .measured_cold_start
@@ -126,6 +133,7 @@ pub fn try_run(
         // behaviour, silently. Two stale daemons served pre-compaction output
         // here and the only symptom was a token count. Version-gate instead.
         "protocol": env!("CARGO_PKG_VERSION"),
+        "build": BUILD_ID,
     });
     if write_frame(&mut stream, &request).is_err() {
         return Ok(None);
@@ -142,9 +150,25 @@ pub fn try_run(
             .ok_or_else(|| "daemon returned a successful response without a result".to_string());
     }
     if let Some(error) = response.get("error").and_then(Value::as_str) {
+        if error.starts_with(STALE_BUILD) {
+            // The old daemon is exiting. Answer this query directly and start
+            // a daemon from the current binary for the next one.
+            replace_stale_daemon();
+            return Ok(None);
+        }
         return Err(error.to_string());
     }
     Ok(None)
+}
+
+fn replace_stale_daemon() {
+    for _ in 0..40 {
+        if UnixStream::connect(socket_path()).is_err() {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    ensure_running();
 }
 
 fn socket_path() -> PathBuf {
@@ -179,7 +203,13 @@ fn handle_connection(stream: UnixStream, pool: &mut Pool) {
                     .run(kind, &file, &sel, &root, &command, raw)
                     .map(|result| json!({"ok": true, "result": result}))
                     .unwrap_or_else(|error| json!({"ok": false, "error": error})),
-                Err(error) => json!({"ok": false, "error": error}),
+                Err(error) => {
+                    if error.starts_with(STALE_BUILD) {
+                        // Stop after replying: this process runs outdated code.
+                        DAEMON_RUNNING.store(false, Ordering::Relaxed);
+                    }
+                    json!({"ok": false, "error": error})
+                }
             },
             Err(error) => json!({"ok": false, "error": error}),
         },
@@ -227,6 +257,14 @@ fn request_to_query(
             "daemon is version {} but the client is {peer}; restart the daemon",
             env!("CARGO_PKG_VERSION")
         ));
+    }
+    // Same version, different sources: a rebuilt client reached a daemon still
+    // running the previous binary. Clients that predate the field send none;
+    // serving them avoids a restart loop while old sessions drain.
+    if let Some(build) = request.get("build").and_then(Value::as_str) {
+        if build != BUILD_ID {
+            return Err(format!("{STALE_BUILD}: daemon is {BUILD_ID}, client is {build}"));
+        }
     }
     Ok((
         kind,
@@ -388,6 +426,32 @@ mod tests {
         }))
         .unwrap_err();
         assert!(err.contains("restart the daemon"), "got: {err}");
+    }
+
+    #[test]
+    fn a_rebuilt_client_marks_the_same_version_daemon_stale() {
+        let err = request_to_query(&json!({
+            "kind": "refs", "file": "/tmp/a.rs", "line": 1, "column": 2,
+            "root": "/tmp", "command": "rust-analyzer",
+            "protocol": env!("CARGO_PKG_VERSION"), "build": "0.1.0+0000000000000000"
+        }))
+        .unwrap_err();
+        assert!(err.starts_with(STALE_BUILD), "got: {err}");
+    }
+
+    #[test]
+    fn matching_or_absent_build_is_served() {
+        for build in [Some(BUILD_ID), None] {
+            let mut req = json!({
+                "kind": "refs", "file": "/tmp/a.rs", "line": 1, "column": 2,
+                "root": "/tmp", "command": "rust-analyzer",
+                "protocol": env!("CARGO_PKG_VERSION")
+            });
+            if let Some(b) = build {
+                req["build"] = json!(b);
+            }
+            assert!(request_to_query(&req).is_ok(), "build {build:?}");
+        }
     }
 
     #[test]
