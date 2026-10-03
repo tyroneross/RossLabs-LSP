@@ -22,6 +22,7 @@ USAGE
   rosslabs-lsp mcp
   rosslabs-lsp daemon
   rosslabs-lsp doctor
+  rosslabs-lsp compat record <registry.json> <record.json>
   rosslabs-lsp compat sections
   rosslabs-lsp compat <registry.json> [--section NAME] [--component NAME]
 

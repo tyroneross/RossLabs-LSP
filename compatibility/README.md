@@ -78,7 +78,7 @@ bytes and the receiving application's draft, including no accidental submit.
 Cover protocol changes, focus, reconnects, IME and provider upgrades. Record the
 host and provider build versions with each result.
 
-This first version reads reviewed evidence. Automatic live probes, importers,
+The registry reads reviewed evidence and accepts explicit native CLI records. Automatic live probes, importers,
 version-range matching, remediation application and release gates are future
 adapters. They must reuse this record contract and retain explicit evidence and
 unknown states. LSP code navigation can locate the responsible implementation;
@@ -126,3 +126,26 @@ Registry files are limited to 1 MiB and must be regular files. Each query includ
 `registry_sha256`, identifying the exact bytes read. That digest detects changed
 records; it does not authenticate their author. Source locators and remediation
 text remain untrusted authored data.
+
+### Record evidence from any native terminal
+
+```sh
+rosslabs-lsp compat record /local/path/registry.json /local/path/record.json
+```
+
+The input is one record using the schema above. This command validates before
+writing, creates a registry if absent, and appends under a local file lock using
+an atomic replacement. Repeating identical evidence is a no-op. An existing ID
+with different evidence is rejected: use a new revision ID and retain the earlier
+record for provenance. Both input and final registry have a 1 MiB limit. The
+parent directory must already exist. Keep the `.lock` file in place; deleting it
+while a writer runs defeats coordination. Writes create private (0600) files.
+
+This stores evidence only. It does not execute repairs or upgrade `reported`
+claims to runtime verification. MCP remains read-only. Keep transcript-derived
+records in local Build Loop memory rather than this public repository. Build
+Loop's compatibility review links registry IDs to the local lesson and verification
+scope for every agent's retrospective.
+
+See [the verification and learning strategy](strategy.md) for contract checks,
+stateful tests, native acceptance, and transcript-candidate triage.
