@@ -119,3 +119,12 @@ because Cargo tracks binary ownership by package name.
 ## License
 
 Apache-2.0 © Tyrone Ross, Jr. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
+
+## Compatibility across components
+
+The CLI and MCP also expose a [compatibility registry](compatibility/README.md)
+for language tooling, terminal input, protocols, environments, builds, UI and
+trust boundaries. Query version-scoped evidence with
+`rosslabs-lsp compat compatibility/registry.json`; unrecorded combinations remain
+unknown. Runtime checks belong to the owning component; the registry does not
+replace LSP semantics or execute fixes.

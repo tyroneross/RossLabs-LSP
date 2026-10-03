@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "records": [
+    {
+      "id": "terminal.modified-return.codex",
+      "section": "terminal-input",
+      "capability": "insert-newline-without-submit",
+      "status": "reproduced",
+      "components": [
+        {
+          "name": "SwiftTerm",
+          "version": "1.16.0"
+        },
+        {
+          "name": "Codex",
+          "version": "0.159.3 source"
+        }
+      ],
+      "symptom": "Control+Return emits no bytes in legacy mode or a modified-key sequence not bound to newline in the application.",
+      "cause": "Host key encoding and application input bindings disagree. A shared PTY transport does not imply shared key semantics.",
+      "remediation": "Host adapter can insert a literal newline using negotiated bracketed paste. Verify the draft changes without submitting. Preserve native handling during IME composition and when paste capability is absent.",
+      "owner": "terminal host adapter; application key binding",
+      "evidence": [
+        {
+          "source": "https://github.com/migueldeicaza/SwiftTerm/tree/3917686ea5f5527c5451aaf371bd90bf3618aa71",
+          "observed_at": "2026-10-02",
+          "scope": "Source inspection of MacTerminalView and AppleTerminalView in SwiftTerm 1.16.0",
+          "result": "Legacy control-character mapping has no Return case. Enhanced keyboard mode uses a modified Return sequence."
+        },
+        {
+          "source": "https://github.com/openai/codex/blob/rust-v0.159.3/codex-rs/tui/src/keymap.rs",
+          "observed_at": "2026-10-02",
+          "scope": "Codex 0.159.3 default source bindings; no claim for custom bindings or newer releases",
+          "result": "Control+Enter is not the default insert-newline binding."
+        }
+      ],
+      "validity": {
+        "workspace": "SwiftTerm and Codex upstream source; Easy Terminal host integration",
+        "snapshot": "SwiftTerm 3917686ea5f5527c5451aaf371bd90bf3618aa71; Codex rust-v0.159.3",
+        "environment": "macOS AppKit terminal host",
+        "build_target": "SwiftTerm macOS terminal; Codex TUI",
+        "capabilities": [
+          "legacy keyboard encoding",
+          "kitty keyboard encoding",
+          "bracketed paste for proposed workaround"
+        ],
+        "limitations": [
+          "Evidence applies to the named versions and default bindings.",
+          "Source evidence does not prove current installed runtime behavior.",
+          "Candidate workaround requires separate provider and host integration tests."
+        ]
+      }
+    }
+  ]
+}

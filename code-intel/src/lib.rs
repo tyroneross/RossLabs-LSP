@@ -3,6 +3,7 @@
 
 //! RossLabs LSP — one implementation, two commands, two surfaces, any agent.
 
+mod compat;
 mod daemon;
 mod lsp;
 mod mcp;
@@ -21,6 +22,8 @@ USAGE
   rosslabs-lsp mcp
   rosslabs-lsp daemon
   rosslabs-lsp doctor
+  rosslabs-lsp compat sections
+  rosslabs-lsp compat <registry.json> [--section NAME] [--component NAME]
 
 OPTIONS
   --raw     emit untouched LSP payloads instead of compact locations
@@ -82,6 +85,7 @@ fn run_as(invoked_as: &str, args: &[String]) -> Result<String, String> {
             Ok(String::new())
         }
         "doctor" => pretty(&query::doctor()),
+        "compat" => pretty(&compat::cli(&args[1..])?),
         verb => {
             let kind =
                 Kind::parse(verb).ok_or_else(|| format!("unknown query '{verb}' (try --help)"))?;

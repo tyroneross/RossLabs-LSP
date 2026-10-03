@@ -100,6 +100,37 @@ fn call_tool(params: &Value) -> Result<Value, String> {
     if name == "doctor" {
         return Ok(tool_result(&query::doctor(), false));
     }
+    if name == "compat" {
+        let result = (|| {
+            let object = args
+                .as_object()
+                .ok_or("compat arguments must be an object")?;
+            if object
+                .keys()
+                .any(|k| !["registry", "section", "component"].contains(&k.as_str()))
+            {
+                return Err("unknown compat argument".into());
+            }
+            let registry = args
+                .get("registry")
+                .and_then(Value::as_str)
+                .ok_or("missing 'registry' path")?;
+            for key in ["section", "component"] {
+                if args.get(key).is_some_and(|v| !v.is_string()) {
+                    return Err(format!("{key} must be a string"));
+                }
+            }
+            crate::compat::query(
+                registry,
+                args.get("section").and_then(Value::as_str),
+                args.get("component").and_then(Value::as_str),
+            )
+        })();
+        return Ok(match result {
+            Ok(v) => tool_result(&v, false),
+            Err(e) => tool_result(&json!({"error":e}), true),
+        });
+    }
     let kind = Kind::parse(name).ok_or_else(|| format!("unknown tool: {name}"))?;
     let file = args
         .get("file")
@@ -170,6 +201,15 @@ fn tool_list() -> Vec<Value> {
         })
     };
     vec![
+        json!({
+            "name":"compat",
+            "description":"Read validated component compatibility evidence. This does not probe live compatibility or execute remedies. Empty coverage means unknown.",
+            "inputSchema":{"type":"object","properties":{
+                "registry":{"type":"string","description":"Explicit path to a compatibility registry JSON file"},
+                "section":{"type":"string","enum":crate::compat::SECTIONS},
+                "component":{"type":"string","description":"Exact component name, case insensitive"}
+            },"required":["registry"],"additionalProperties":false}
+        }),
         point("def", "Resolve the definition of the symbol at a position. Compiler-accurate, unlike text search."),
         point("refs", "Find every reference to the symbol at a position, across files."),
         point("hover", "Inferred type and documentation for the symbol at a position."),
@@ -236,6 +276,26 @@ mod tests {
     use super::*;
 
     #[test]
+    fn compatibility_tool_returns_evidence_and_errors_without_language_server() {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../compatibility/registry.json"
+        );
+        let out =
+            call_tool(&json!({"name":"compat","arguments":{"registry":path,"component":"Codex"}}))
+                .unwrap();
+        assert_eq!(out["isError"], false);
+        let body: Value =
+            serde_json::from_str(out["content"][0]["text"].as_str().unwrap()).unwrap();
+        assert_eq!(body["coverage"], "recorded");
+        assert_eq!(body["live_verified"], false);
+        let bad = call_tool(&json!({"name":"compat","arguments":{"registry":path,"section":42}}))
+            .unwrap();
+        assert_eq!(bad["isError"], true);
+        assert!(tool_list().iter().any(|t| t["name"] == "compat"));
+    }
+
+    #[test]
     fn initialize_reports_tools_capability() {
         let r = handle(&json!({"jsonrpc":"2.0","id":1,"method":"initialize"})).unwrap();
         assert_eq!(r["result"]["serverInfo"]["name"], "rosslabs-lsp");
@@ -256,7 +316,7 @@ mod tests {
                 "{name} has no object schema"
             );
             assert!(
-                name == "doctor" || Kind::parse(name).is_some(),
+                name == "doctor" || name == "compat" || Kind::parse(name).is_some(),
                 "tool {name} maps to no query kind"
             );
         }
