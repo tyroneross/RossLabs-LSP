@@ -22,3 +22,15 @@ path = [
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 Tyrone Ross, Jr <46267523+tyroneross@users.noreply.github.com>"
 SPDX-License-Identifier = "Apache-2.0"
+
+# Third-party data: verbatim subset of the Agent Client Protocol registry.
+# The "_snapshot" wrapper object is ours; the agent entries are upstream's.
+# See THIRD-PARTY-NOTICES.md.
+[[annotations]]
+path = "code-intel/data/acp-registry.json"
+precedence = "override"
+SPDX-FileCopyrightText = [
+    "Agent Client Protocol registry contributors <https://github.com/agentclientprotocol/registry>",
+    "2026 Tyrone Ross, Jr <46267523+tyroneross@users.noreply.github.com>",
+]
+SPDX-License-Identifier = "Apache-2.0"

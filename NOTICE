@@ -5,3 +5,5 @@ This product was authored by Tyrone Ross, Jr (https://github.com/tyroneross/Ross
 Portions of this software were developed with the assistance of Anthropic's Claude
 (via Claude Code); AI-pair-programming contributions are attributed via
 Co-Authored-By trailers in the git history.
+
+This product includes data from the Agent Client Protocol registry (https://github.com/agentclientprotocol/registry), licensed under the Apache License 2.0. See THIRD-PARTY-NOTICES.md.
