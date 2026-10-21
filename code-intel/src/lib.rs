@@ -3,6 +3,7 @@
 
 //! RossLabs LSP — one implementation, two commands, two surfaces, any agent.
 
+mod acp;
 mod compat;
 mod daemon;
 mod lsp;
@@ -22,6 +23,7 @@ USAGE
   rosslabs-lsp mcp
   rosslabs-lsp daemon
   rosslabs-lsp doctor
+  rosslabs-lsp acp doctor [--agent ID]... [--cwd DIR] [--timeout SECS] [--json] [--first-token] [--registry PATH|URL]
   rosslabs-lsp compat record <registry.json> <record.json>
   rosslabs-lsp compat sections
   rosslabs-lsp compat <registry.json> [--section NAME] [--component NAME]
@@ -41,6 +43,12 @@ EXAMPLES
   rosslabs-lsp def src/query.rs:42:11
   rosslabs-lsp symbols scripts/build.py
   rosslabs-lsp doctor
+
+ACP
+  acp doctor   probe installed ACP agents (claude, gemini, cursor, opencode,
+               codex, goose, kiro): version vs registry, initialize and
+               session/new timings. --first-token also times one tiny prompt
+               (costs tokens; never run by default).
 
 MODES
   mcp       serve the same queries over MCP stdio (for Claude Code, Codex, ...)
@@ -86,6 +94,10 @@ fn run_as(invoked_as: &str, args: &[String]) -> Result<String, String> {
             Ok(String::new())
         }
         "doctor" => pretty(&query::doctor()),
+        "acp" => {
+            acp::install_signal_handlers();
+            acp::cli(&args[1..])
+        }
         "compat" => pretty(&compat::cli(&args[1..])?),
         verb => {
             let kind =

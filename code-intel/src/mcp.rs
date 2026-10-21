@@ -100,6 +100,13 @@ fn call_tool(params: &Value) -> Result<Value, String> {
     if name == "doctor" {
         return Ok(tool_result(&query::doctor(), false));
     }
+    if name == "acp_doctor" {
+        let result = crate::acp::parse_mcp(&args).and_then(|o| crate::acp::doctor(&o));
+        return Ok(match result {
+            Ok(v) => tool_result(&v, false),
+            Err(e) => tool_result(&json!({"error": e}), true),
+        });
+    }
     if name == "compat" {
         let result = (|| {
             let object = args
@@ -221,6 +228,17 @@ fn tool_list() -> Vec<Value> {
             "description": "Report which language servers are registered and installed.",
             "inputSchema": {"type": "object", "properties": {}}
         }),
+        json!({
+            "name": "acp_doctor",
+            "description": "Probe installed Agent Client Protocol (ACP v1) agents: installed vs registry version, initialize and session/new timings in ms, auth state, stdout hygiene. Spawns each agent briefly and always kills it. first_token sends one tiny prompt and costs tokens.",
+            "inputSchema": {"type": "object", "properties": {
+                "agents": {"type": "array", "items": {"type": "string", "enum": crate::acp::BUILTINS.iter().map(|b| b.id).collect::<Vec<_>>()}, "description": "Agents to check; default every built-in agent"},
+                "cwd": {"type": "string", "description": "Session working directory; default a fresh temp dir per agent"},
+                "timeout": {"type": "number", "description": "Seconds per step (default 20)"},
+                "first_token": {"type": "boolean", "description": "Also time the first agent_message_chunk of a one-word prompt. Costs tokens; default false"},
+                "registry": {"type": "string", "description": "Registry JSON path or URL; default the vendored snapshot"}
+            }, "additionalProperties": false}
+        }),
     ]
 }
 
@@ -233,6 +251,8 @@ fn error_frame(id: Value, code: i64, message: &str) -> Value {
 extern "C" fn on_signal(_sig: i32) {
     // Only async-signal-safe calls are legal here, so exit immediately rather
     // than unwinding. Exit 0, not 128+n, so supervisors do not respawn us.
+    // An acp_doctor probe runs in its own process group; kill it first.
+    crate::acp::kill_active_group();
     unsafe { libc::_exit(0) }
 }
 
@@ -296,6 +316,19 @@ mod tests {
     }
 
     #[test]
+    fn acp_doctor_tool_is_listed_and_rejects_bad_arguments_as_tool_errors() {
+        let tool = tool_list()
+            .into_iter()
+            .find(|t| t["name"] == "acp_doctor")
+            .unwrap();
+        assert_eq!(tool["inputSchema"]["additionalProperties"], false);
+        for args in [json!({"agents": ["nobody"]}), json!({"timeout": "x"}), json!({"x": 1})] {
+            let out = call_tool(&json!({"name": "acp_doctor", "arguments": args})).unwrap();
+            assert_eq!(out["isError"], true, "{args}");
+        }
+    }
+
+    #[test]
     fn initialize_reports_tools_capability() {
         let r = handle(&json!({"jsonrpc":"2.0","id":1,"method":"initialize"})).unwrap();
         assert_eq!(r["result"]["serverInfo"]["name"], "rosslabs-lsp");
@@ -316,7 +349,10 @@ mod tests {
                 "{name} has no object schema"
             );
             assert!(
-                name == "doctor" || name == "compat" || Kind::parse(name).is_some(),
+                name == "doctor"
+                    || name == "compat"
+                    || name == "acp_doctor"
+                    || Kind::parse(name).is_some(),
                 "tool {name} maps to no query kind"
             );
         }

@@ -90,6 +90,28 @@ args = ["mcp"]
 MCP_IDLE_TIMEOUT_MS = "1800000"
 ```
 
+## ACP agent doctor
+
+`rosslabs-lsp acp doctor` checks the coding agents installed on this machine
+that speak the [Agent Client Protocol](https://agentclientprotocol.com) v1:
+claude (`claude-agent-acp`), gemini, cursor, opencode, codex (`codex-acp`),
+goose and kiro. For each one it compares the installed version with the ACP
+registry, then spawns the agent and times `initialize` and `session/new` in ms.
+It reports sign-in requirements and non-JSON stdout lines.
+
+```bash
+rosslabs-lsp acp doctor                          # table, every built-in agent
+rosslabs-lsp acp doctor --agent claude --json    # stable JSON schema
+rosslabs-lsp acp doctor --first-token            # also time one tiny prompt (costs tokens)
+```
+
+It works offline against a vendored registry snapshot
+(`code-intel/data/acp-registry.json`); `--registry PATH|URL` overrides it.
+Every step has a deadline (`--timeout`, default 20 s), and each agent runs in
+its own process group, which is killed after the check. A hang reports as
+`timeout at <step>`. Exit is 0 whenever the check ran; only bad usage is
+nonzero. MCP exposes the same check as the `acp_doctor` tool.
+
 ## Claude Code plugins
 
 ```

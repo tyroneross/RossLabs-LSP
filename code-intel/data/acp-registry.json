@@ -1,0 +1,255 @@
+{
+  "_snapshot": {
+    "source": "https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json",
+    "fetched": "2026-10-21",
+    "note": "Subset of the live ACP registry: only agents in the rosslabs-lsp acp doctor built-in table. Entries are copied verbatim. Override with --registry <path|url>."
+  },
+  "version": "1.0.0",
+  "agents": [
+    {
+      "id": "claude-acp",
+      "name": "Claude Agent",
+      "version": "0.94.0",
+      "description": "ACP wrapper for Anthropic's Claude",
+      "repository": "https://github.com/agentclientprotocol/claude-agent-acp",
+      "authors": [
+        "Anthropic",
+        "Zed Industries",
+        "JetBrains"
+      ],
+      "license": "proprietary",
+      "license_url": "https://github.com/agentclientprotocol/claude-agent-acp/blob/main/LICENSE",
+      "distribution": {
+        "npx": {
+          "package": "@agentclientprotocol/claude-agent-acp@0.94.0"
+        }
+      },
+      "icon": "https://cdn.agentclientprotocol.com/registry/v1/latest/claude-acp.svg"
+    },
+    {
+      "id": "codex-acp",
+      "name": "Codex",
+      "version": "2.2.2",
+      "description": "ACP adapter for OpenAI's coding assistant",
+      "repository": "https://github.com/agentclientprotocol/codex-acp",
+      "authors": [
+        "OpenAI",
+        "JetBrains s.r.o",
+        "Zed Industries"
+      ],
+      "license": "Apache-2.0",
+      "license_url": "https://github.com/agentclientprotocol/codex-acp/blob/main/LICENSE",
+      "distribution": {
+        "npx": {
+          "package": "@agentclientprotocol/codex-acp@2.2.2"
+        }
+      },
+      "icon": "https://cdn.agentclientprotocol.com/registry/v1/latest/codex-acp.svg"
+    },
+    {
+      "id": "cursor",
+      "name": "Cursor",
+      "version": "2026.10.19",
+      "description": "Cursor's coding agent",
+      "website": "https://cursor.com/docs/cli/acp",
+      "authors": [
+        "Cursor"
+      ],
+      "license": "proprietary",
+      "license_url": "https://cursor.com/terms-of-service",
+      "distribution": {
+        "binary": {
+          "darwin-aarch64": {
+            "archive": "https://downloads.cursor.com/lab/2026.10.19-6bbf2c4/darwin/arm64/agent-cli-package.tar.gz",
+            "cmd": "./dist-package/cursor-agent",
+            "args": [
+              "acp"
+            ]
+          },
+          "darwin-x86_64": {
+            "archive": "https://downloads.cursor.com/lab/2026.10.19-6bbf2c4/darwin/x64/agent-cli-package.tar.gz",
+            "cmd": "./dist-package/cursor-agent",
+            "args": [
+              "acp"
+            ]
+          },
+          "linux-aarch64": {
+            "archive": "https://downloads.cursor.com/lab/2026.10.19-6bbf2c4/linux/arm64/agent-cli-package.tar.gz",
+            "cmd": "./dist-package/cursor-agent",
+            "args": [
+              "acp"
+            ]
+          },
+          "linux-x86_64": {
+            "archive": "https://downloads.cursor.com/lab/2026.10.19-6bbf2c4/linux/x64/agent-cli-package.tar.gz",
+            "cmd": "./dist-package/cursor-agent",
+            "args": [
+              "acp"
+            ]
+          },
+          "windows-aarch64": {
+            "archive": "https://downloads.cursor.com/lab/2026.10.19-6bbf2c4/windows/arm64/agent-cli-package.zip",
+            "cmd": "./dist-package\\cursor-agent.cmd",
+            "args": [
+              "acp"
+            ]
+          },
+          "windows-x86_64": {
+            "archive": "https://downloads.cursor.com/lab/2026.10.19-6bbf2c4/windows/x64/agent-cli-package.zip",
+            "cmd": "./dist-package\\cursor-agent.cmd",
+            "args": [
+              "acp"
+            ]
+          }
+        }
+      },
+      "icon": "https://cdn.agentclientprotocol.com/registry/v1/latest/cursor.svg"
+    },
+    {
+      "id": "gemini",
+      "name": "Gemini CLI",
+      "version": "0.65.0",
+      "description": "Google's official CLI for Gemini",
+      "repository": "https://github.com/google-gemini/gemini-cli",
+      "website": "https://geminicli.com",
+      "authors": [
+        "Google"
+      ],
+      "license": "Apache-2.0",
+      "license_url": "https://github.com/google-gemini/gemini-cli/blob/main/LICENSE",
+      "distribution": {
+        "npx": {
+          "package": "@google/gemini-cli@0.65.0",
+          "args": [
+            "--acp"
+          ]
+        }
+      },
+      "icon": "https://cdn.agentclientprotocol.com/registry/v1/latest/gemini.svg"
+    },
+    {
+      "id": "goose",
+      "name": "goose",
+      "version": "1.55.0",
+      "description": "A local, extensible, open source AI agent that automates engineering tasks",
+      "repository": "https://github.com/block/goose",
+      "website": "https://block.github.io/goose/",
+      "authors": [
+        "Block"
+      ],
+      "license": "Apache-2.0",
+      "license_url": "https://github.com/block/goose/blob/main/LICENSE",
+      "distribution": {
+        "binary": {
+          "darwin-aarch64": {
+            "archive": "https://github.com/block/goose/releases/download/v1.55.0/goose-aarch64-apple-darwin.tar.bz2",
+            "cmd": "./goose",
+            "args": [
+              "acp"
+            ],
+            "sha256": "007322bcd885f29b4ff5a0d4c4aaa15bfc5dc8b1ac9b57f3a8a8818e5c88d407"
+          },
+          "darwin-x86_64": {
+            "archive": "https://github.com/block/goose/releases/download/v1.55.0/goose-x86_64-apple-darwin.tar.bz2",
+            "cmd": "./goose",
+            "args": [
+              "acp"
+            ],
+            "sha256": "a6fbe20c2b23cc92d1d5561b4977348bcb47593de30c61d388baecde1cb4fcf1"
+          },
+          "linux-aarch64": {
+            "archive": "https://github.com/block/goose/releases/download/v1.55.0/goose-aarch64-unknown-linux-gnu.tar.bz2",
+            "cmd": "./goose",
+            "args": [
+              "acp"
+            ],
+            "sha256": "e6cded0c5d7d8227f052928eed22a4d64043c3d6551275faa96a9be7d26a9068"
+          },
+          "linux-x86_64": {
+            "archive": "https://github.com/block/goose/releases/download/v1.55.0/goose-x86_64-unknown-linux-gnu.tar.bz2",
+            "cmd": "./goose",
+            "args": [
+              "acp"
+            ],
+            "sha256": "d9afefe7b8f4e372ebefd8b465ab6eea1f297304d058e8e9379ed627e0329708"
+          },
+          "windows-x86_64": {
+            "archive": "https://github.com/block/goose/releases/download/v1.55.0/goose-x86_64-pc-windows-msvc.zip",
+            "cmd": "./goose-package\\goose.exe",
+            "args": [
+              "acp"
+            ],
+            "sha256": "1df27bbe5178123f29246f069865a7451e1d7a70d143cdae6e2f930078ce6a71"
+          }
+        }
+      },
+      "icon": "https://cdn.agentclientprotocol.com/registry/v1/latest/goose.svg"
+    },
+    {
+      "id": "opencode",
+      "name": "OpenCode",
+      "version": "1.19.3",
+      "description": "The open source coding agent",
+      "repository": "https://github.com/anomalyco/opencode",
+      "website": "https://opencode.ai",
+      "authors": [
+        "Anomaly"
+      ],
+      "license": "MIT",
+      "license_url": "https://github.com/anomalyco/opencode/blob/dev/LICENSE",
+      "icon": "https://cdn.agentclientprotocol.com/registry/v1/latest/opencode.svg",
+      "distribution": {
+        "binary": {
+          "darwin-aarch64": {
+            "archive": "https://github.com/anomalyco/opencode/releases/download/v1.19.3/opencode-darwin-arm64.zip",
+            "cmd": "./opencode",
+            "args": [
+              "acp"
+            ],
+            "sha256": "c2d0fecd27acf6e08be02c1f5d384614d07495587766bcc4a6bff3971749bb64"
+          },
+          "darwin-x86_64": {
+            "archive": "https://github.com/anomalyco/opencode/releases/download/v1.19.3/opencode-darwin-x64.zip",
+            "cmd": "./opencode",
+            "args": [
+              "acp"
+            ],
+            "sha256": "4e29dbe2f61ace728370523c88027d0742b3a79edcdd2c70e404f616d4ef8f36"
+          },
+          "linux-aarch64": {
+            "archive": "https://github.com/anomalyco/opencode/releases/download/v1.19.3/opencode-linux-arm64.tar.gz",
+            "cmd": "./opencode",
+            "args": [
+              "acp"
+            ],
+            "sha256": "7900818a6a98881edbbadab4b7525940eff3b9750040c200481f9f56cacee405"
+          },
+          "linux-x86_64": {
+            "archive": "https://github.com/anomalyco/opencode/releases/download/v1.19.3/opencode-linux-x64.tar.gz",
+            "cmd": "./opencode",
+            "args": [
+              "acp"
+            ],
+            "sha256": "13a8fb2978302071b86f9d7e00da9c8895f9cd846978379c3bdc6a5333536c9b"
+          },
+          "windows-aarch64": {
+            "archive": "https://github.com/anomalyco/opencode/releases/download/v1.19.3/opencode-windows-arm64.zip",
+            "cmd": "./opencode",
+            "args": [
+              "acp"
+            ],
+            "sha256": "c1b9daf18c97564b2d171703279621f7edc3613e70750d796ef78db87257ad89"
+          },
+          "windows-x86_64": {
+            "archive": "https://github.com/anomalyco/opencode/releases/download/v1.19.3/opencode-windows-x64.zip",
+            "cmd": "./opencode.exe",
+            "args": [
+              "acp"
+            ],
+            "sha256": "e4ce9117f55fc068414513789f8c7d1049f855d7518bb4e350b9170a3a20d8c3"
+          }
+        }
+      }
+    }
+  ]
+}

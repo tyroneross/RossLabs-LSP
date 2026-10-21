@@ -44,6 +44,7 @@ rosslabs-lsp hover   src/query.rs::workspace_root   # inferred type + docs
 rosslabs-lsp symbols scripts/build.py               # outline a file
 rosslabs-lsp diag    scripts/build.py               # type + compile errors
 rosslabs-lsp doctor                                 # server coverage
+rosslabs-lsp acp doctor                             # ACP agent versions + handshake timings
 ```
 
 JSON on stdout, errors on stderr, non-zero exit on failure.
@@ -115,7 +116,8 @@ args = ["mcp"]
 MCP_IDLE_TIMEOUT_MS = "1800000"
 ```
 
-Tools: `def`, `refs`, `hover`, `symbols`, `diag`, `doctor`. They take a
+Tools: `def`, `refs`, `hover`, `symbols`, `diag`, `doctor`, `compat`, `acp_doctor`.
+The query tools take a
 `symbol` argument in preference to `line`/`column`, for the same durability
 reason. MCP mode starts a daemon itself — without a warm pool every query
 spawns its own language server, measured at 3.5s against 0.02s.
