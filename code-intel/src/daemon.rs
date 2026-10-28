@@ -263,7 +263,9 @@ fn request_to_query(
     // serving them avoids a restart loop while old sessions drain.
     if let Some(build) = request.get("build").and_then(Value::as_str) {
         if build != BUILD_ID {
-            return Err(format!("{STALE_BUILD}: daemon is {BUILD_ID}, client is {build}"));
+            return Err(format!(
+                "{STALE_BUILD}: daemon is {BUILD_ID}, client is {build}"
+            ));
         }
     }
     Ok((

@@ -322,7 +322,11 @@ mod tests {
             .find(|t| t["name"] == "acp_doctor")
             .unwrap();
         assert_eq!(tool["inputSchema"]["additionalProperties"], false);
-        for args in [json!({"agents": ["nobody"]}), json!({"timeout": "x"}), json!({"x": 1})] {
+        for args in [
+            json!({"agents": ["nobody"]}),
+            json!({"timeout": "x"}),
+            json!({"x": 1}),
+        ] {
             let out = call_tool(&json!({"name": "acp_doctor", "arguments": args})).unwrap();
             assert_eq!(out["isError"], true, "{args}");
         }

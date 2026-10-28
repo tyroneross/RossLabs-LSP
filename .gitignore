@@ -1,4 +1,6 @@
 .rally/
+**/.bookmark/
+.procedural/
 .navgator/
 .build-loop/
 **/.build-loop/

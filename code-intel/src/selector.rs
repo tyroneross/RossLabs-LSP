@@ -115,12 +115,20 @@ pub fn resolve_symbol(symbols: &Value, path: &[String]) -> Result<Value, String>
             } else {
                 // A silently truncated list reads as "these are all the
                 // symbols" — say how many were left out.
-                let shown: Vec<&str> = hits.iter().map(|(p, _, _)| p.as_str()).take(FOUND_LIMIT).collect();
+                let shown: Vec<&str> = hits
+                    .iter()
+                    .map(|(p, _, _)| p.as_str())
+                    .take(FOUND_LIMIT)
+                    .collect();
                 let more = hits.len().saturating_sub(FOUND_LIMIT);
                 format!(
                     " (found: {}{})",
                     shown.join(", "),
-                    if more > 0 { format!(", … +{more} more") } else { String::new() }
+                    if more > 0 {
+                        format!(", … +{more} more")
+                    } else {
+                        String::new()
+                    }
                 )
             }
         )),
@@ -146,7 +154,10 @@ fn base_name(segment: &str) -> &str {
 fn same_base_path(qualified: &str, path: &[String]) -> bool {
     let segments: Vec<&str> = qualified.split('/').collect();
     segments.len() == path.len()
-        && segments.iter().zip(path).all(|(have, want)| base_name(have) == base_name(want))
+        && segments
+            .iter()
+            .zip(path)
+            .all(|(have, want)| base_name(have) == base_name(want))
 }
 
 /// Flatten a symbol tree into (qualified_path, position, line) triples.
@@ -345,8 +356,14 @@ mod tests {
 
     #[test]
     fn bare_name_matches_a_swift_labeled_function() {
-        assert_eq!(resolve_symbol(&swift_tree(), &["responsibleApp".into()]).unwrap()["line"], 25);
-        assert_eq!(resolve_symbol(&swift_tree(), &["load".into()]).unwrap()["line"], 2);
+        assert_eq!(
+            resolve_symbol(&swift_tree(), &["responsibleApp".into()]).unwrap()["line"],
+            25
+        );
+        assert_eq!(
+            resolve_symbol(&swift_tree(), &["load".into()]).unwrap()["line"],
+            2
+        );
         assert_eq!(
             resolve_symbol(&swift_tree(), &["Loader".into(), "load".into()]).unwrap()["line"],
             2

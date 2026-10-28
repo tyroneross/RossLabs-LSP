@@ -13,7 +13,9 @@ use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 
 fn collect(dir: &Path, out: &mut Vec<PathBuf>) {
-    let Ok(entries) = std::fs::read_dir(dir) else { return };
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
     for entry in entries.flatten() {
         let path = entry.path();
         if path.is_dir() {
@@ -35,7 +37,9 @@ fn main() {
         file.hash(&mut hasher);
         std::fs::read(file).unwrap_or_default().hash(&mut hasher);
     }
-    std::fs::read("Cargo.toml").unwrap_or_default().hash(&mut hasher);
+    std::fs::read("Cargo.toml")
+        .unwrap_or_default()
+        .hash(&mut hasher);
     println!(
         "cargo:rustc-env=ROSSLABS_LSP_BUILD_ID={}+{:016x}",
         std::env::var("CARGO_PKG_VERSION").unwrap_or_default(),
