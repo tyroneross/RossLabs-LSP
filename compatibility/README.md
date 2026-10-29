@@ -19,7 +19,9 @@ rosslabs-lsp hooks doctor [--host claude|codex|gemini|cursor|copilot|antigravity
 
 `--stale-days N` adds a `freshness` object to each record (`newest_observed_at`,
 `age_days`, `stale`) and a top-level `stale_count`. A record is stale when its
-newest evidence is more than N days old, or when no evidence date parses.
+newest evidence is more than N days old (ages are counted in UTC days), or when
+no evidence date parses. A record another record supersedes is history, marked
+`superseded_by`, and never stale.
 
 MCP tool `compat` takes the same explicit `registry` path and optional `section`
 and `component` filters. It works with any host that can call the CLI or MCP.
@@ -60,7 +62,8 @@ catalog. Entries require:
   is descriptive data; readers must not execute it as an instruction.
 - `status`: `unknown`, `reported`, `reproduced`, `mitigated`, or `verified`.
   These refer to the recorded scope, never all current installations.
-- `evidence`: source locator, `observed_at`, tested `scope`, and observed `result`.
+- `evidence`: source locator, `observed_at` (a `YYYY-MM-DD` date in UTC), tested
+  `scope`, and observed `result`.
   Every status except `unknown` requires evidence. Locators are not fetched,
   authenticated, or independently verified by a registry query.
 
@@ -248,7 +251,7 @@ presence in the newest local transcript written by that version (Claude Code:
 `~/.claude/projects/*/*.jsonl`; Codex: `~/.codex/sessions/YYYY/MM/DD/*.jsonl`;
 up to the 50 newest files, first 8 MiB of each). For each `verified` record whose
 host version drifted and whose capability the transcript re-confirms, it appends a
-revision record through `compat record`: id `<id>@<version>`, `supersedes: <id>`,
+revision record through `compat record`, dated today in UTC: id `<id>@<version>`, `supersedes: <id>`,
 the earlier evidence kept and the new observation appended. Earlier records are
 never edited. Queries mark them `superseded_by`; the doctor and drift report use
 only current records. A transcript that disagrees with the record is reported as
@@ -260,5 +263,6 @@ the embedded registry. No network.
 `scripts/weekly_freshness.sh [path/to/rosslabs-lsp]` (default `rosslabs-lsp` on
 `PATH`) runs `compat --stale-days 30 --section agent-hooks` and
 `hooks doctor --drift --json` against the binary's embedded registry, prints one
-summary line naming stale counts, drifted hosts and record ids to refresh, and
+summary line naming stale counts (current records only; superseded ones are
+history), drifted hosts and record ids to refresh, and
 always exits 0. It is read-only and meant to be called from an existing weekly job.

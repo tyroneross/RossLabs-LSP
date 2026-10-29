@@ -21,21 +21,27 @@ if ! command -v "$BIN" >/dev/null 2>&1; then
   exit 0
 fi
 
-stale_json=$("$BIN" compat --stale-days "$STALE_DAYS" --section "$SECTION" 2>&1) || {
-  echo "$(date '+%F %T') weekly-freshness: compat failed: $stale_json"
+# stdout is JSON; stderr is kept apart so a warning never corrupts it.
+err_file=$(mktemp "${TMPDIR:-/tmp}/weekly-freshness.XXXXXX") || exit 0
+trap 'rm -f "$err_file"' EXIT
+
+if ! stale_json=$("$BIN" compat --stale-days "$STALE_DAYS" --section "$SECTION" 2>"$err_file"); then
+  echo "$(date '+%F %T') weekly-freshness: compat failed: $(head -c 2000 "$err_file")"
   exit 0
-}
-drift_json=$("$BIN" hooks doctor --drift --json 2>&1) || {
-  echo "$(date '+%F %T') weekly-freshness: hooks doctor --drift failed: $drift_json"
+fi
+if ! drift_json=$("$BIN" hooks doctor --drift --json 2>"$err_file"); then
+  echo "$(date '+%F %T') weekly-freshness: hooks doctor --drift failed: $(head -c 2000 "$err_file")"
   exit 0
-}
+fi
 
 summary=$(STALE="$stale_json" DRIFT="$drift_json" /usr/bin/python3 -I -c '
 import json, os
 s = json.loads(os.environ["STALE"]); d = json.loads(os.environ["DRIFT"])
-stale = [r["id"] for r in s["records"] if r.get("freshness", {}).get("stale")]
+# Superseded records are history: count only the current ones.
+current = [r for r in s["records"] if not r.get("superseded_by")]
+stale = [r["id"] for r in current if r.get("freshness", {}).get("stale")]
 drift = [h for h in d["hosts"] if h["status"] == "drift"]
-parts = ["stale %d/%d records (>%s days)" % (len(stale), len(s["records"]), s["stale_days"])]
+parts = ["stale %d/%d current records (>%s days)" % (len(stale), len(current), s["stale_days"])]
 parts.append("drift %d host(s)" % len(drift))
 for h in drift:
     parts.append("%s installed %s vs %s: refresh %s" % (
