@@ -252,3 +252,9 @@ only current records. A transcript that disagrees with the record is reported as
 never rewritten; stale ones are flagged `flag-stale` for a manual docs re-read.
 Writes need an explicit registry path; without one, only `--dry-run` runs against
 the embedded registry. No network.
+
+`scripts/weekly_freshness.sh [path/to/rosslabs-lsp]` (default `rosslabs-lsp` on
+`PATH`) runs `compat --stale-days 30 --section agent-hooks` and
+`hooks doctor --drift --json` against the binary's embedded registry, prints one
+summary line naming stale counts, drifted hosts and record ids to refresh, and
+always exits 0. It is read-only and meant to be called from an existing weekly job.
