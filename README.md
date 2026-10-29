@@ -146,7 +146,17 @@ Apache-2.0 © Tyrone Ross, Jr. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
 
 The CLI and MCP also expose a [compatibility registry](compatibility/README.md)
 for language tooling, terminal input, protocols, environments, builds, UI and
-trust boundaries. Query version-scoped evidence with
+trust boundaries, and agent hooks. Query version-scoped evidence with
 `rosslabs-lsp compat compatibility/registry.json`; unrecorded combinations remain
 unknown. Runtime checks belong to the owning component; the registry does not
 replace LSP semantics or execute fixes.
+
+### Agent hooks
+
+`rosslabs-lsp hooks doctor [--host ID] [--json]` (MCP: `hooks_doctor`) reads the
+hook configs of installed agent hosts — Claude Code, Codex, Gemini CLI, Cursor,
+Copilot CLI and Antigravity — and checks them against the `agent-hooks` records:
+events a host does not support, turn-end hooks written for session exit, outputs
+a host ignores, unpinned `npx` packages, and host versions outside the recorded
+evidence. It is read-only and redacts command values. See
+[compatibility/README.md](compatibility/README.md#agent-hooks).

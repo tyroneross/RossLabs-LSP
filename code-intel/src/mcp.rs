@@ -107,6 +107,12 @@ fn call_tool(params: &Value) -> Result<Value, String> {
             Err(e) => tool_result(&json!({"error": e}), true),
         });
     }
+    if name == "hooks_doctor" {
+        return Ok(match crate::hooks::mcp(&args) {
+            Ok(v) => tool_result(&v, false),
+            Err(e) => tool_result(&json!({"error": e}), true),
+        });
+    }
     if name == "compat" {
         let result = (|| {
             let object = args
@@ -216,6 +222,16 @@ fn tool_list() -> Vec<Value> {
                 "section":{"type":"string","enum":crate::compat::SECTIONS},
                 "component":{"type":"string","description":"Exact component name, case insensitive"}
             },"required":["registry"],"additionalProperties":false}
+        }),
+        json!({
+            "name": "hooks_doctor",
+            "description": "Read-only check of agent hook configs (Claude Code, Codex, Gemini, Cursor, Copilot, Antigravity) against agent-hooks compatibility records: unsupported events, turn-end hooks written for session exit, outputs a host ignores, npx packages, version drift and stale evidence. Never edits configs; command values are redacted.",
+            "inputSchema": {"type": "object", "properties": {
+                "host": {"type": "string", "enum": ["claude", "codex", "gemini", "cursor", "copilot", "antigravity"]},
+                "stale_days": {"type": "integer", "minimum": 0, "description": "Evidence older than this is stale (default 30)"},
+                "cwd": {"type": "string", "description": "Project directory for project-level configs; default the server cwd"},
+                "registry": {"type": "string", "description": "Registry JSON path; default the embedded snapshot"}
+            }, "additionalProperties": false}
         }),
         point("def", "Resolve the definition of the symbol at a position. Compiler-accurate, unlike text search."),
         point("refs", "Find every reference to the symbol at a position, across files."),
@@ -356,6 +372,7 @@ mod tests {
                 name == "doctor"
                     || name == "compat"
                     || name == "acp_doctor"
+                    || name == "hooks_doctor"
                     || Kind::parse(name).is_some(),
                 "tool {name} maps to no query kind"
             );

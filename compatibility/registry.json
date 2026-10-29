@@ -50,6 +50,2399 @@
           "Candidate workaround requires separate provider and host integration tests."
         ]
       }
+    },
+    {
+      "id": "agent-hooks.claude.session-start-context-inject",
+      "section": "agent-hooks",
+      "capability": "session-start-context-inject",
+      "status": "reported",
+      "components": [
+        {
+          "name": "Claude Code",
+          "version": "unknown"
+        },
+        {
+          "name": "hook script",
+          "version": "unknown"
+        }
+      ],
+      "symptom": "Session-start hook output does not reach the model.",
+      "cause": "Hosts differ in whether and how session-start output is injected.",
+      "remediation": "Check this record's result before relying on the capability; degrade to another event when support is no.",
+      "owner": "hook script author; host adapter",
+      "evidence": [
+        {
+          "source": "https://code.claude.com/docs/en/hooks",
+          "observed_at": "2026-10-28",
+          "scope": "Claude Code official hooks documentation, undated, fetched 2026-10-28; no version stated",
+          "result": "SessionStart may return hookSpecificOutput.additionalContext."
+        }
+      ],
+      "validity": {
+        "workspace": "not-applicable",
+        "snapshot": "documentation fetched 2026-10-28",
+        "environment": "macOS; host defaults",
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:yes"
+        ],
+        "limitations": [
+          "Documentation evidence; not executed against an installed host.",
+          "Applies to the documented release behaviour on the fetch date."
+        ]
+      }
+    },
+    {
+      "id": "agent-hooks.claude.prompt-submit-context-inject",
+      "section": "agent-hooks",
+      "capability": "prompt-submit-context-inject",
+      "status": "reported",
+      "components": [
+        {
+          "name": "Claude Code",
+          "version": "unknown"
+        },
+        {
+          "name": "hook script",
+          "version": "unknown"
+        }
+      ],
+      "symptom": "Context printed by a prompt-submit hook is ignored.",
+      "cause": "Hosts differ in whether prompt-time hooks may add context.",
+      "remediation": "Check this record's result before relying on the capability; degrade to another event when support is no.",
+      "owner": "hook script author; host adapter",
+      "evidence": [
+        {
+          "source": "https://code.claude.com/docs/en/hooks",
+          "observed_at": "2026-10-28",
+          "scope": "Claude Code official hooks documentation, undated, fetched 2026-10-28; no version stated",
+          "result": "UserPromptSubmit may return hookSpecificOutput.additionalContext."
+        }
+      ],
+      "validity": {
+        "workspace": "not-applicable",
+        "snapshot": "documentation fetched 2026-10-28",
+        "environment": "macOS; host defaults",
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:yes"
+        ],
+        "limitations": [
+          "Documentation evidence; not executed against an installed host.",
+          "Applies to the documented release behaviour on the fetch date."
+        ]
+      }
+    },
+    {
+      "id": "agent-hooks.claude.turn-end-block-and-continue",
+      "section": "agent-hooks",
+      "capability": "turn-end-block-and-continue",
+      "status": "verified",
+      "components": [
+        {
+          "name": "Claude Code",
+          "version": "unknown"
+        },
+        {
+          "name": "Bookmark",
+          "version": "unknown"
+        }
+      ],
+      "symptom": "A turn-end hook written for session exit runs every turn, or cannot force another turn.",
+      "cause": "Turn-end events fire per agent turn; continuation output differs by host.",
+      "remediation": "Check this record's result before relying on the capability; degrade to another event when support is no.",
+      "owner": "hook script author; host adapter",
+      "evidence": [
+        {
+          "source": "https://code.claude.com/docs/en/hooks",
+          "observed_at": "2026-10-28",
+          "scope": "Bookmark Stop hook on one Mac (Claude Code version not recorded) plus official hooks documentation fetched 2026-10-28",
+          "result": "Stop fires at the end of every turn, not at session exit. decision:block with reason continues the turn; SessionEnd covers exit."
+        }
+      ],
+      "validity": {
+        "workspace": "not-applicable",
+        "snapshot": "local files read 2026-10-28",
+        "environment": "macOS; host defaults",
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:yes"
+        ],
+        "limitations": [
+          "Local observation did not record the Claude Code version.",
+          "Covers command hooks from settings files."
+        ]
+      }
+    },
+    {
+      "id": "agent-hooks.claude.precompact-event",
+      "section": "agent-hooks",
+      "capability": "precompact-event",
+      "status": "reported",
+      "components": [
+        {
+          "name": "Claude Code",
+          "version": "unknown"
+        },
+        {
+          "name": "hook script",
+          "version": "unknown"
+        }
+      ],
+      "symptom": "A pre-compaction checkpoint hook never runs.",
+      "cause": "Not every host exposes a compaction event.",
+      "remediation": "Check this record's result before relying on the capability; degrade to another event when support is no.",
+      "owner": "hook script author; host adapter",
+      "evidence": [
+        {
+          "source": "https://code.claude.com/docs/en/hooks",
+          "observed_at": "2026-10-28",
+          "scope": "Claude Code official hooks documentation, undated, fetched 2026-10-28; no version stated",
+          "result": "PreCompact and PostCompact events exist."
+        }
+      ],
+      "validity": {
+        "workspace": "not-applicable",
+        "snapshot": "documentation fetched 2026-10-28",
+        "environment": "macOS; host defaults",
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:yes"
+        ],
+        "limitations": [
+          "Documentation evidence; not executed against an installed host.",
+          "Applies to the documented release behaviour on the fetch date."
+        ]
+      }
+    },
+    {
+      "id": "agent-hooks.claude.session-end-event",
+      "section": "agent-hooks",
+      "capability": "session-end-event",
+      "status": "reported",
+      "components": [
+        {
+          "name": "Claude Code",
+          "version": "unknown"
+        },
+        {
+          "name": "hook script",
+          "version": "unknown"
+        }
+      ],
+      "symptom": "Session-exit cleanup never runs or runs at an unexpected time.",
+      "cause": "Not every host exposes a session-end event; triggers differ.",
+      "remediation": "Check this record's result before relying on the capability; degrade to another event when support is no.",
+      "owner": "hook script author; host adapter",
+      "evidence": [
+        {
+          "source": "https://code.claude.com/docs/en/hooks",
+          "observed_at": "2026-10-28",
+          "scope": "Claude Code official hooks documentation, undated, fetched 2026-10-28; no version stated",
+          "result": "SessionEnd fires at session exit; Stop does not."
+        }
+      ],
+      "validity": {
+        "workspace": "not-applicable",
+        "snapshot": "documentation fetched 2026-10-28",
+        "environment": "macOS; host defaults",
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:yes"
+        ],
+        "limitations": [
+          "Documentation evidence; not executed against an installed host.",
+          "Applies to the documented release behaviour on the fetch date."
+        ]
+      }
+    },
+    {
+      "id": "agent-hooks.claude.transcript-token-usage",
+      "section": "agent-hooks",
+      "capability": "transcript-token-usage",
+      "status": "verified",
+      "components": [
+        {
+          "name": "Claude Code",
+          "version": "2.1.306"
+        },
+        {
+          "name": "hook script",
+          "version": "unknown"
+        }
+      ],
+      "symptom": "A hook cannot measure context usage from the transcript.",
+      "cause": "Transcript formats and usage fields differ by host.",
+      "remediation": "Check this record's result before relying on the capability; degrade to another event when support is no.",
+      "owner": "hook script author; host adapter",
+      "evidence": [
+        {
+          "source": "local transcript under the Claude projects directory",
+          "observed_at": "2026-10-28",
+          "scope": "One Claude Code 2.1.306 session transcript on one Mac",
+          "result": "Assistant message records carry message.usage with input_tokens, output_tokens, cache_read_input_tokens and cache_creation_input_tokens."
+        }
+      ],
+      "validity": {
+        "workspace": "not-applicable",
+        "snapshot": "local files read 2026-10-28",
+        "environment": "macOS; host defaults",
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:yes"
+        ],
+        "limitations": [
+          "Read-only inspection of local files on one Mac; not a documented contract.",
+          "Applies to the named host version only."
+        ]
+      }
+    },
+    {
+      "id": "agent-hooks.claude.transcript-context-window",
+      "section": "agent-hooks",
+      "capability": "transcript-context-window",
+      "status": "verified",
+      "components": [
+        {
+          "name": "Claude Code",
+          "version": "2.1.306"
+        },
+        {
+          "name": "hook script",
+          "version": "unknown"
+        }
+      ],
+      "symptom": "A hook cannot read the model context window and must use another source.",
+      "cause": "Few transcripts record the context window size.",
+      "remediation": "Check this record's result before relying on the capability; degrade to another event when support is no.",
+      "owner": "hook script author; host adapter",
+      "evidence": [
+        {
+          "source": "local transcript under the Claude projects directory",
+          "observed_at": "2026-10-28",
+          "scope": "One Claude Code 2.1.306 session transcript on one Mac",
+          "result": "No context_window or max_input_tokens field appears in the transcript; window must come from a table, catalog or override."
+        }
+      ],
+      "validity": {
+        "workspace": "not-applicable",
+        "snapshot": "local files read 2026-10-28",
+        "environment": "macOS; host defaults",
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:no"
+        ],
+        "limitations": [
+          "Read-only inspection of local files on one Mac; not a documented contract.",
+          "Applies to the named host version only."
+        ]
+      }
+    },
+    {
+      "id": "agent-hooks.claude.hook-config-location",
+      "section": "agent-hooks",
+      "capability": "hook-config-location",
+      "status": "reported",
+      "components": [
+        {
+          "name": "Claude Code",
+          "version": "unknown"
+        },
+        {
+          "name": "hook script",
+          "version": "unknown"
+        }
+      ],
+      "symptom": "Hooks written to the wrong file or with the wrong event names never fire.",
+      "cause": "Each host reads its own config locations, format and event names.",
+      "remediation": "Check this record's result before relying on the capability; degrade to another event when support is no.",
+      "owner": "hook script author; host adapter",
+      "evidence": [
+        {
+          "source": "https://code.claude.com/docs/en/hooks",
+          "observed_at": "2026-10-28",
+          "scope": "Claude Code official hooks documentation, undated, fetched 2026-10-28; no version stated",
+          "result": "Hooks live under the hooks key of ~/.claude/settings.json, .claude/settings.json, .claude/settings.local.json, managed policy and plugin hooks/hooks.json."
+        }
+      ],
+      "validity": {
+        "workspace": "not-applicable",
+        "snapshot": "documentation fetched 2026-10-28",
+        "environment": "macOS; host defaults",
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:yes",
+          "event:SessionStart",
+          "event:Setup",
+          "event:UserPromptSubmit",
+          "event:UserPromptExpansion",
+          "event:PreToolUse",
+          "event:PermissionRequest",
+          "event:PermissionDenied",
+          "event:PostToolUse",
+          "event:PostToolUseFailure",
+          "event:PostToolBatch",
+          "event:Notification",
+          "event:MessageDisplay",
+          "event:SubagentStart",
+          "event:SubagentStop",
+          "event:TaskCreated",
+          "event:TaskCompleted",
+          "event:Stop",
+          "event:StopFailure",
+          "event:TeammateIdle",
+          "event:InstructionsLoaded",
+          "event:ConfigChange",
+          "event:CwdChanged",
+          "event:DirectoryAdded",
+          "event:FileChanged",
+          "event:WorktreeCreate",
+          "event:WorktreeRemove",
+          "event:PreCompact",
+          "event:PostCompact",
+          "event:PreModelSwitch",
+          "event:PostModelSwitch",
+          "event:Elicitation",
+          "event:ElicitationResult",
+          "event:SessionEnd"
+        ],
+        "limitations": [
+          "Documentation evidence; not executed against an installed host.",
+          "Applies to the documented release behaviour on the fetch date."
+        ]
+      }
+    },
+    {
+      "id": "agent-hooks.codex.session-start-context-inject",
+      "section": "agent-hooks",
+      "capability": "session-start-context-inject",
+      "status": "reported",
+      "components": [
+        {
+          "name": "Codex CLI",
+          "version": "unknown"
+        },
+        {
+          "name": "hook script",
+          "version": "unknown"
+        }
+      ],
+      "symptom": "Session-start hook output does not reach the model.",
+      "cause": "Hosts differ in whether and how session-start output is injected.",
+      "remediation": "Check this record's result before relying on the capability; degrade to another event when support is no.",
+      "owner": "hook script author; host adapter",
+      "evidence": [
+        {
+          "source": "https://learn.chatgpt.com/docs/hooks",
+          "observed_at": "2026-10-28",
+          "scope": "Codex CLI official hooks documentation, undated, fetched 2026-10-28; no version stated",
+          "result": "SessionStart accepts hookSpecificOutput.additionalContext; plain stdout also becomes developer context."
+        }
+      ],
+      "validity": {
+        "workspace": "not-applicable",
+        "snapshot": "documentation fetched 2026-10-28",
+        "environment": "macOS; host defaults",
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:yes"
+        ],
+        "limitations": [
+          "Documentation evidence; not executed against an installed host.",
+          "Applies to the documented release behaviour on the fetch date."
+        ]
+      }
+    },
+    {
+      "id": "agent-hooks.codex.prompt-submit-context-inject",
+      "section": "agent-hooks",
+      "capability": "prompt-submit-context-inject",
+      "status": "reported",
+      "components": [
+        {
+          "name": "Codex CLI",
+          "version": "unknown"
+        },
+        {
+          "name": "hook script",
+          "version": "unknown"
+        }
+      ],
+      "symptom": "Context printed by a prompt-submit hook is ignored.",
+      "cause": "Hosts differ in whether prompt-time hooks may add context.",
+      "remediation": "Check this record's result before relying on the capability; degrade to another event when support is no.",
+      "owner": "hook script author; host adapter",
+      "evidence": [
+        {
+          "source": "https://learn.chatgpt.com/docs/hooks",
+          "observed_at": "2026-10-28",
+          "scope": "Codex CLI official hooks documentation, undated, fetched 2026-10-28; no version stated",
+          "result": "UserPromptSubmit accepts hookSpecificOutput.additionalContext; plain stdout also becomes developer context."
+        }
+      ],
+      "validity": {
+        "workspace": "not-applicable",
+        "snapshot": "documentation fetched 2026-10-28",
+        "environment": "macOS; host defaults",
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:yes"
+        ],
+        "limitations": [
+          "Documentation evidence; not executed against an installed host.",
+          "Applies to the documented release behaviour on the fetch date."
+        ]
+      }
+    },
+    {
+      "id": "agent-hooks.codex.turn-end-block-and-continue",
+      "section": "agent-hooks",
+      "capability": "turn-end-block-and-continue",
+      "status": "reported",
+      "components": [
+        {
+          "name": "Codex CLI",
+          "version": "unknown"
+        },
+        {
+          "name": "hook script",
+          "version": "unknown"
+        }
+      ],
+      "symptom": "A turn-end hook written for session exit runs every turn, or cannot force another turn.",
+      "cause": "Turn-end events fire per agent turn; continuation output differs by host.",
+      "remediation": "Check this record's result before relying on the capability; degrade to another event when support is no.",
+      "owner": "hook script author; host adapter",
+      "evidence": [
+        {
+          "source": "https://learn.chatgpt.com/docs/hooks",
+          "observed_at": "2026-10-28",
+          "scope": "Codex CLI official hooks documentation, undated, fetched 2026-10-28; no version stated",
+          "result": "Stop fires per turn and requires JSON stdout. decision:block with reason continues using reason as the next prompt, matching Claude Code."
+        }
+      ],
+      "validity": {
+        "workspace": "not-applicable",
+        "snapshot": "documentation fetched 2026-10-28",
+        "environment": "macOS; host defaults",
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:yes",
+          "stop-requires-json"
+        ],
+        "limitations": [
+          "Documentation evidence; not executed against an installed host.",
+          "Applies to the documented release behaviour on the fetch date."
+        ]
+      }
+    },
+    {
+      "id": "agent-hooks.codex.precompact-event",
+      "section": "agent-hooks",
+      "capability": "precompact-event",
+      "status": "reported",
+      "components": [
+        {
+          "name": "Codex CLI",
+          "version": "unknown"
+        },
+        {
+          "name": "hook script",
+          "version": "unknown"
+        }
+      ],
+      "symptom": "A pre-compaction checkpoint hook never runs.",
+      "cause": "Not every host exposes a compaction event.",
+      "remediation": "Check this record's result before relying on the capability; degrade to another event when support is no.",
+      "owner": "hook script author; host adapter",
+      "evidence": [
+        {
+          "source": "https://learn.chatgpt.com/docs/hooks",
+          "observed_at": "2026-10-28",
+          "scope": "Codex CLI official hooks documentation, undated, fetched 2026-10-28; no version stated",
+          "result": "PreCompact and PostCompact fire with trigger manual or auto."
+        }
+      ],
+      "validity": {
+        "workspace": "not-applicable",
+        "snapshot": "documentation fetched 2026-10-28",
+        "environment": "macOS; host defaults",
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:yes"
+        ],
+        "limitations": [
+          "Documentation evidence; not executed against an installed host.",
+          "Applies to the documented release behaviour on the fetch date."
+        ]
+      }
+    },
+    {
+      "id": "agent-hooks.codex.session-end-event",
+      "section": "agent-hooks",
+      "capability": "session-end-event",
+      "status": "reported",
+      "components": [
+        {
+          "name": "Codex CLI",
+          "version": "unknown"
+        },
+        {
+          "name": "hook script",
+          "version": "unknown"
+        }
+      ],
+      "symptom": "Session-exit cleanup never runs or runs at an unexpected time.",
+      "cause": "Not every host exposes a session-end event; triggers differ.",
+      "remediation": "Check this record's result before relying on the capability; degrade to another event when support is no.",
+      "owner": "hook script author; host adapter",
+      "evidence": [
+        {
+          "source": "https://learn.chatgpt.com/docs/hooks",
+          "observed_at": "2026-10-28",
+          "scope": "Codex CLI official hooks documentation, undated, fetched 2026-10-28; no version stated",
+          "result": "SessionEnd runs on close, archive or delete, or after 30 minutes idle; reason is currently always other."
+        }
+      ],
+      "validity": {
+        "workspace": "not-applicable",
+        "snapshot": "documentation fetched 2026-10-28",
+        "environment": "macOS; host defaults",
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:yes"
+        ],
+        "limitations": [
+          "Documentation evidence; not executed against an installed host.",
+          "Applies to the documented release behaviour on the fetch date."
+        ]
+      }
+    },
+    {
+      "id": "agent-hooks.codex.transcript-token-usage",
+      "section": "agent-hooks",
+      "capability": "transcript-token-usage",
+      "status": "verified",
+      "components": [
+        {
+          "name": "Codex CLI",
+          "version": "0.165.0"
+        },
+        {
+          "name": "hook script",
+          "version": "unknown"
+        }
+      ],
+      "symptom": "A hook cannot measure context usage from the transcript.",
+      "cause": "Transcript formats and usage fields differ by host.",
+      "remediation": "Check this record's result before relying on the capability; degrade to another event when support is no.",
+      "owner": "hook script author; host adapter",
+      "evidence": [
+        {
+          "source": "local Codex rollout JSONL under the Codex sessions directory",
+          "observed_at": "2026-10-28",
+          "scope": "Codex CLI 0.165.0 rollouts on one Mac (cli_version from session_meta)",
+          "result": "Rollout event_msg records with payload.type token_count carry info.last_token_usage and info.total_token_usage."
+        }
+      ],
+      "validity": {
+        "workspace": "not-applicable",
+        "snapshot": "local files read 2026-10-28",
+        "environment": "macOS; host defaults",
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:yes"
+        ],
+        "limitations": [
+          "Read-only inspection of local files on one Mac; not a documented contract.",
+          "Applies to the named host version only."
+        ]
+      }
+    },
+    {
+      "id": "agent-hooks.codex.transcript-context-window",
+      "section": "agent-hooks",
+      "capability": "transcript-context-window",
+      "status": "verified",
+      "components": [
+        {
+          "name": "Codex CLI",
+          "version": "0.165.0"
+        },
+        {
+          "name": "hook script",
+          "version": "unknown"
+        }
+      ],
+      "symptom": "A hook cannot read the model context window and must use another source.",
+      "cause": "Few transcripts record the context window size.",
+      "remediation": "Check this record's result before relying on the capability; degrade to another event when support is no.",
+      "owner": "hook script author; host adapter",
+      "evidence": [
+        {
+          "source": "local Codex rollout JSONL under the Codex sessions directory",
+          "observed_at": "2026-10-28",
+          "scope": "Codex CLI 0.165.0 rollouts on one Mac (cli_version from session_meta)",
+          "result": "token_count info.model_context_window is present (observed 475000)."
+        }
+      ],
+      "validity": {
+        "workspace": "not-applicable",
+        "snapshot": "local files read 2026-10-28",
+        "environment": "macOS; host defaults",
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:yes"
+        ],
+        "limitations": [
+          "Read-only inspection of local files on one Mac; not a documented contract.",
+          "Applies to the named host version only."
+        ]
+      }
+    },
+    {
+      "id": "agent-hooks.codex.hook-config-location",
+      "section": "agent-hooks",
+      "capability": "hook-config-location",
+      "status": "reported",
+      "components": [
+        {
+          "name": "Codex CLI",
+          "version": "unknown"
+        },
+        {
+          "name": "hook script",
+          "version": "unknown"
+        }
+      ],
+      "symptom": "Hooks written to the wrong file or with the wrong event names never fire.",
+      "cause": "Each host reads its own config locations, format and event names.",
+      "remediation": "Check this record's result before relying on the capability; degrade to another event when support is no.",
+      "owner": "hook script author; host adapter",
+      "evidence": [
+        {
+          "source": "https://learn.chatgpt.com/docs/hooks",
+          "observed_at": "2026-10-28",
+          "scope": "Codex CLI official hooks documentation, undated, fetched 2026-10-28; no version stated",
+          "result": "Hooks merge from ~/.codex/hooks.json, ~/.codex/config.toml [hooks], repo .codex/hooks.json and .codex/config.toml (trusted repos only) and enabled plugins' hooks/hooks.json. Non-managed hooks need one-time trust review."
+        }
+      ],
+      "validity": {
+        "workspace": "not-applicable",
+        "snapshot": "documentation fetched 2026-10-28",
+        "environment": "macOS; host defaults",
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:yes",
+          "event:SessionStart",
+          "event:UserPromptSubmit",
+          "event:PreCompact",
+          "event:PostCompact",
+          "event:Stop",
+          "event:SessionEnd",
+          "event:Interrupt",
+          "event:SubagentStart",
+          "event:SubagentStop",
+          "event:PreToolUse",
+          "event:PostToolUse"
+        ],
+        "limitations": [
+          "Documentation evidence; not executed against an installed host.",
+          "Applies to the documented release behaviour on the fetch date."
+        ]
+      }
+    },
+    {
+      "id": "agent-hooks.gemini.session-start-context-inject",
+      "section": "agent-hooks",
+      "capability": "session-start-context-inject",
+      "status": "reported",
+      "components": [
+        {
+          "name": "Gemini CLI",
+          "version": "unknown"
+        },
+        {
+          "name": "hook script",
+          "version": "unknown"
+        }
+      ],
+      "symptom": "Session-start hook output does not reach the model.",
+      "cause": "Hosts differ in whether and how session-start output is injected.",
+      "remediation": "Check this record's result before relying on the capability; degrade to another event when support is no.",
+      "owner": "hook script author; host adapter",
+      "evidence": [
+        {
+          "source": "https://geminicli.com/docs/hooks/reference.md",
+          "observed_at": "2026-10-28",
+          "scope": "Gemini CLI official hooks documentation, undated, fetched 2026-10-28; no version stated",
+          "result": "SessionStart hookSpecificOutput.additionalContext becomes the first history turn interactively and is prepended to the prompt non-interactively."
+        }
+      ],
+      "validity": {
+        "workspace": "not-applicable",
+        "snapshot": "documentation fetched 2026-10-28",
+        "environment": "macOS; host defaults",
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:yes"
+        ],
+        "limitations": [
+          "Documentation evidence; not executed against an installed host.",
+          "Applies to the documented release behaviour on the fetch date."
+        ]
+      }
+    },
+    {
+      "id": "agent-hooks.gemini.prompt-submit-context-inject",
+      "section": "agent-hooks",
+      "capability": "prompt-submit-context-inject",
+      "status": "reported",
+      "components": [
+        {
+          "name": "Gemini CLI",
+          "version": "unknown"
+        },
+        {
+          "name": "hook script",
+          "version": "unknown"
+        }
+      ],
+      "symptom": "Context printed by a prompt-submit hook is ignored.",
+      "cause": "Hosts differ in whether prompt-time hooks may add context.",
+      "remediation": "Check this record's result before relying on the capability; degrade to another event when support is no.",
+      "owner": "hook script author; host adapter",
+      "evidence": [
+        {
+          "source": "https://geminicli.com/docs/hooks/reference.md",
+          "observed_at": "2026-10-28",
+          "scope": "Gemini CLI official hooks documentation, undated, fetched 2026-10-28; no version stated",
+          "result": "BeforeAgent receives the prompt; whether it honours additionalContext was not established."
+        }
+      ],
+      "validity": {
+        "workspace": "not-applicable",
+        "snapshot": "documentation fetched 2026-10-28",
+        "environment": "macOS; host defaults",
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:unknown"
+        ],
+        "limitations": [
+          "Documentation evidence; not executed against an installed host.",
+          "Applies to the documented release behaviour on the fetch date."
+        ]
+      }
+    },
+    {
+      "id": "agent-hooks.gemini.turn-end-block-and-continue",
+      "section": "agent-hooks",
+      "capability": "turn-end-block-and-continue",
+      "status": "reported",
+      "components": [
+        {
+          "name": "Gemini CLI",
+          "version": "unknown"
+        },
+        {
+          "name": "hook script",
+          "version": "unknown"
+        }
+      ],
+      "symptom": "A turn-end hook written for session exit runs every turn, or cannot force another turn.",
+      "cause": "Turn-end events fire per agent turn; continuation output differs by host.",
+      "remediation": "Check this record's result before relying on the capability; degrade to another event when support is no.",
+      "owner": "hook script author; host adapter",
+      "evidence": [
+        {
+          "source": "https://geminicli.com/docs/hooks/reference.md",
+          "observed_at": "2026-10-28",
+          "scope": "Gemini CLI official hooks documentation, undated, fetched 2026-10-28; no version stated",
+          "result": "AfterAgent fires per turn; decision deny (block is an alias) rejects the response and sends reason as a new prompt; continue:false ends without retry."
+        }
+      ],
+      "validity": {
+        "workspace": "not-applicable",
+        "snapshot": "documentation fetched 2026-10-28",
+        "environment": "macOS; host defaults",
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:yes"
+        ],
+        "limitations": [
+          "Documentation evidence; not executed against an installed host.",
+          "Applies to the documented release behaviour on the fetch date."
+        ]
+      }
+    },
+    {
+      "id": "agent-hooks.gemini.precompact-event",
+      "section": "agent-hooks",
+      "capability": "precompact-event",
+      "status": "reported",
+      "components": [
+        {
+          "name": "Gemini CLI",
+          "version": "unknown"
+        },
+        {
+          "name": "hook script",
+          "version": "unknown"
+        }
+      ],
+      "symptom": "A pre-compaction checkpoint hook never runs.",
+      "cause": "Not every host exposes a compaction event.",
+      "remediation": "Check this record's result before relying on the capability; degrade to another event when support is no.",
+      "owner": "hook script author; host adapter",
+      "evidence": [
+        {
+          "source": "https://geminicli.com/docs/hooks/reference.md",
+          "observed_at": "2026-10-28",
+          "scope": "Gemini CLI official hooks documentation, undated, fetched 2026-10-28; no version stated",
+          "result": "PreCompress fires before compression and is advisory only."
+        }
+      ],
+      "validity": {
+        "workspace": "not-applicable",
+        "snapshot": "documentation fetched 2026-10-28",
+        "environment": "macOS; host defaults",
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:yes"
+        ],
+        "limitations": [
+          "Documentation evidence; not executed against an installed host.",
+          "Applies to the documented release behaviour on the fetch date."
+        ]
+      }
+    },
+    {
+      "id": "agent-hooks.gemini.session-end-event",
+      "section": "agent-hooks",
+      "capability": "session-end-event",
+      "status": "reported",
+      "components": [
+        {
+          "name": "Gemini CLI",
+          "version": "unknown"
+        },
+        {
+          "name": "hook script",
+          "version": "unknown"
+        }
+      ],
+      "symptom": "Session-exit cleanup never runs or runs at an unexpected time.",
+      "cause": "Not every host exposes a session-end event; triggers differ.",
+      "remediation": "Check this record's result before relying on the capability; degrade to another event when support is no.",
+      "owner": "hook script author; host adapter",
+      "evidence": [
+        {
+          "source": "https://geminicli.com/docs/hooks/reference.md",
+          "observed_at": "2026-10-28",
+          "scope": "Gemini CLI official hooks documentation, undated, fetched 2026-10-28; no version stated",
+          "result": "SessionEnd fires with reason exit, clear, logout, prompt_input_exit or other."
+        }
+      ],
+      "validity": {
+        "workspace": "not-applicable",
+        "snapshot": "documentation fetched 2026-10-28",
+        "environment": "macOS; host defaults",
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:yes"
+        ],
+        "limitations": [
+          "Documentation evidence; not executed against an installed host.",
+          "Applies to the documented release behaviour on the fetch date."
+        ]
+      }
+    },
+    {
+      "id": "agent-hooks.gemini.transcript-token-usage",
+      "section": "agent-hooks",
+      "capability": "transcript-token-usage",
+      "status": "reported",
+      "components": [
+        {
+          "name": "Gemini CLI",
+          "version": "unknown"
+        },
+        {
+          "name": "hook script",
+          "version": "unknown"
+        }
+      ],
+      "symptom": "A hook cannot measure context usage from the transcript.",
+      "cause": "Transcript formats and usage fields differ by host.",
+      "remediation": "Check this record's result before relying on the capability; degrade to another event when support is no.",
+      "owner": "hook script author; host adapter",
+      "evidence": [
+        {
+          "source": "https://geminicli.com/docs/cli/session-management.md",
+          "observed_at": "2026-10-28",
+          "scope": "Gemini CLI official hooks documentation, undated, fetched 2026-10-28; no version stated",
+          "result": "Docs say chats record token usage statistics without a schema; sampled local session files had no tokens key."
+        }
+      ],
+      "validity": {
+        "workspace": "not-applicable",
+        "snapshot": "documentation fetched 2026-10-28",
+        "environment": "macOS; host defaults",
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:unknown"
+        ],
+        "limitations": [
+          "Documentation evidence; not executed against an installed host.",
+          "Applies to the documented release behaviour on the fetch date."
+        ]
+      }
+    },
+    {
+      "id": "agent-hooks.gemini.transcript-context-window",
+      "section": "agent-hooks",
+      "capability": "transcript-context-window",
+      "status": "reported",
+      "components": [
+        {
+          "name": "Gemini CLI",
+          "version": "unknown"
+        },
+        {
+          "name": "hook script",
+          "version": "unknown"
+        }
+      ],
+      "symptom": "A hook cannot read the model context window and must use another source.",
+      "cause": "Few transcripts record the context window size.",
+      "remediation": "Check this record's result before relying on the capability; degrade to another event when support is no.",
+      "owner": "hook script author; host adapter",
+      "evidence": [
+        {
+          "source": "https://geminicli.com/docs/cli/session-management.md",
+          "observed_at": "2026-10-28",
+          "scope": "Gemini CLI official hooks documentation, undated, fetched 2026-10-28; no version stated",
+          "result": "No context window is documented in the session record."
+        }
+      ],
+      "validity": {
+        "workspace": "not-applicable",
+        "snapshot": "documentation fetched 2026-10-28",
+        "environment": "macOS; host defaults",
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:no"
+        ],
+        "limitations": [
+          "Documentation evidence; not executed against an installed host.",
+          "Applies to the documented release behaviour on the fetch date."
+        ]
+      }
+    },
+    {
+      "id": "agent-hooks.gemini.hook-config-location",
+      "section": "agent-hooks",
+      "capability": "hook-config-location",
+      "status": "reported",
+      "components": [
+        {
+          "name": "Gemini CLI",
+          "version": "unknown"
+        },
+        {
+          "name": "hook script",
+          "version": "unknown"
+        }
+      ],
+      "symptom": "Hooks written to the wrong file or with the wrong event names never fire.",
+      "cause": "Each host reads its own config locations, format and event names.",
+      "remediation": "Check this record's result before relying on the capability; degrade to another event when support is no.",
+      "owner": "hook script author; host adapter",
+      "evidence": [
+        {
+          "source": "https://geminicli.com/docs/hooks/reference.md",
+          "observed_at": "2026-10-28",
+          "scope": "Gemini CLI official hooks documentation, undated, fetched 2026-10-28; no version stated",
+          "result": "hooks key in .gemini/settings.json, ~/.gemini/settings.json, /etc/gemini-cli/settings.json and extensions. Event names differ from Claude Code (BeforeAgent, AfterAgent, PreCompress)."
+        }
+      ],
+      "validity": {
+        "workspace": "not-applicable",
+        "snapshot": "documentation fetched 2026-10-28",
+        "environment": "macOS; host defaults",
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:yes",
+          "event:SessionStart",
+          "event:BeforeAgent",
+          "event:PreCompress",
+          "event:AfterAgent",
+          "event:SessionEnd",
+          "event:BeforeModel",
+          "event:AfterModel",
+          "event:BeforeToolSelection",
+          "event:BeforeTool",
+          "event:AfterTool",
+          "event:Notification"
+        ],
+        "limitations": [
+          "Documentation evidence; not executed against an installed host.",
+          "Applies to the documented release behaviour on the fetch date."
+        ]
+      }
+    },
+    {
+      "id": "agent-hooks.copilot.session-start-context-inject",
+      "section": "agent-hooks",
+      "capability": "session-start-context-inject",
+      "status": "reported",
+      "components": [
+        {
+          "name": "Copilot CLI",
+          "version": "unknown"
+        },
+        {
+          "name": "hook script",
+          "version": "unknown"
+        }
+      ],
+      "symptom": "Session-start hook output does not reach the model.",
+      "cause": "Hosts differ in whether and how session-start output is injected.",
+      "remediation": "Check this record's result before relying on the capability; degrade to another event when support is no.",
+      "owner": "hook script author; host adapter",
+      "evidence": [
+        {
+          "source": "https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-hooks-reference",
+          "observed_at": "2026-10-28",
+          "scope": "Copilot CLI official hooks documentation, undated, fetched 2026-10-28; no version stated",
+          "result": "sessionStart may return additionalContext."
+        }
+      ],
+      "validity": {
+        "workspace": "not-applicable",
+        "snapshot": "documentation fetched 2026-10-28",
+        "environment": "macOS; host defaults",
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:yes"
+        ],
+        "limitations": [
+          "Documentation evidence; not executed against an installed host.",
+          "Applies to the documented release behaviour on the fetch date."
+        ]
+      }
+    },
+    {
+      "id": "agent-hooks.copilot.prompt-submit-context-inject",
+      "section": "agent-hooks",
+      "capability": "prompt-submit-context-inject",
+      "status": "reported",
+      "components": [
+        {
+          "name": "Copilot CLI",
+          "version": "unknown"
+        },
+        {
+          "name": "hook script",
+          "version": "unknown"
+        }
+      ],
+      "symptom": "Context printed by a prompt-submit hook is ignored.",
+      "cause": "Hosts differ in whether prompt-time hooks may add context.",
+      "remediation": "Check this record's result before relying on the capability; degrade to another event when support is no.",
+      "owner": "hook script author; host adapter",
+      "evidence": [
+        {
+          "source": "https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-hooks-reference",
+          "observed_at": "2026-10-28",
+          "scope": "Copilot CLI official hooks documentation, undated, fetched 2026-10-28; no version stated",
+          "result": "userPromptSubmitted may return modifiedPrompt, honoured only by SDK hooks; it cannot inject context."
+        }
+      ],
+      "validity": {
+        "workspace": "not-applicable",
+        "snapshot": "documentation fetched 2026-10-28",
+        "environment": "macOS; host defaults",
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:no"
+        ],
+        "limitations": [
+          "Documentation evidence; not executed against an installed host.",
+          "Applies to the documented release behaviour on the fetch date."
+        ]
+      }
+    },
+    {
+      "id": "agent-hooks.copilot.turn-end-block-and-continue",
+      "section": "agent-hooks",
+      "capability": "turn-end-block-and-continue",
+      "status": "reported",
+      "components": [
+        {
+          "name": "Copilot CLI",
+          "version": "unknown"
+        },
+        {
+          "name": "hook script",
+          "version": "unknown"
+        }
+      ],
+      "symptom": "A turn-end hook written for session exit runs every turn, or cannot force another turn.",
+      "cause": "Turn-end events fire per agent turn; continuation output differs by host.",
+      "remediation": "Check this record's result before relying on the capability; degrade to another event when support is no.",
+      "owner": "hook script author; host adapter",
+      "evidence": [
+        {
+          "source": "https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-hooks-reference",
+          "observed_at": "2026-10-28",
+          "scope": "Copilot CLI official hooks documentation, undated, fetched 2026-10-28; no version stated",
+          "result": "agentStop decision:block with reason forces another turn; a runaway guard stops after 8 consecutive blocks."
+        }
+      ],
+      "validity": {
+        "workspace": "not-applicable",
+        "snapshot": "documentation fetched 2026-10-28",
+        "environment": "macOS; host defaults",
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:yes"
+        ],
+        "limitations": [
+          "Documentation evidence; not executed against an installed host.",
+          "Applies to the documented release behaviour on the fetch date."
+        ]
+      }
+    },
+    {
+      "id": "agent-hooks.copilot.precompact-event",
+      "section": "agent-hooks",
+      "capability": "precompact-event",
+      "status": "reported",
+      "components": [
+        {
+          "name": "Copilot CLI",
+          "version": "unknown"
+        },
+        {
+          "name": "hook script",
+          "version": "unknown"
+        }
+      ],
+      "symptom": "A pre-compaction checkpoint hook never runs.",
+      "cause": "Not every host exposes a compaction event.",
+      "remediation": "Check this record's result before relying on the capability; degrade to another event when support is no.",
+      "owner": "hook script author; host adapter",
+      "evidence": [
+        {
+          "source": "https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-hooks-reference",
+          "observed_at": "2026-10-28",
+          "scope": "Copilot CLI official hooks documentation, undated, fetched 2026-10-28; no version stated",
+          "result": "preCompact is notification only."
+        }
+      ],
+      "validity": {
+        "workspace": "not-applicable",
+        "snapshot": "documentation fetched 2026-10-28",
+        "environment": "macOS; host defaults",
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:yes"
+        ],
+        "limitations": [
+          "Documentation evidence; not executed against an installed host.",
+          "Applies to the documented release behaviour on the fetch date."
+        ]
+      }
+    },
+    {
+      "id": "agent-hooks.copilot.session-end-event",
+      "section": "agent-hooks",
+      "capability": "session-end-event",
+      "status": "reported",
+      "components": [
+        {
+          "name": "Copilot CLI",
+          "version": "unknown"
+        },
+        {
+          "name": "hook script",
+          "version": "unknown"
+        }
+      ],
+      "symptom": "Session-exit cleanup never runs or runs at an unexpected time.",
+      "cause": "Not every host exposes a session-end event; triggers differ.",
+      "remediation": "Check this record's result before relying on the capability; degrade to another event when support is no.",
+      "owner": "hook script author; host adapter",
+      "evidence": [
+        {
+          "source": "https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-hooks-reference",
+          "observed_at": "2026-10-28",
+          "scope": "Copilot CLI official hooks documentation, undated, fetched 2026-10-28; no version stated",
+          "result": "sessionEnd fires with reason."
+        }
+      ],
+      "validity": {
+        "workspace": "not-applicable",
+        "snapshot": "documentation fetched 2026-10-28",
+        "environment": "macOS; host defaults",
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:yes"
+        ],
+        "limitations": [
+          "Documentation evidence; not executed against an installed host.",
+          "Applies to the documented release behaviour on the fetch date."
+        ]
+      }
+    },
+    {
+      "id": "agent-hooks.copilot.transcript-token-usage",
+      "section": "agent-hooks",
+      "capability": "transcript-token-usage",
+      "status": "reported",
+      "components": [
+        {
+          "name": "Copilot CLI",
+          "version": "unknown"
+        },
+        {
+          "name": "hook script",
+          "version": "unknown"
+        }
+      ],
+      "symptom": "A hook cannot measure context usage from the transcript.",
+      "cause": "Transcript formats and usage fields differ by host.",
+      "remediation": "Check this record's result before relying on the capability; degrade to another event when support is no.",
+      "owner": "hook script author; host adapter",
+      "evidence": [
+        {
+          "source": "https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-hooks-reference",
+          "observed_at": "2026-10-28",
+          "scope": "Copilot CLI official hooks documentation, undated, fetched 2026-10-28; no version stated",
+          "result": "GitHub does not document the transcript format."
+        }
+      ],
+      "validity": {
+        "workspace": "not-applicable",
+        "snapshot": "documentation fetched 2026-10-28",
+        "environment": "macOS; host defaults",
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:unknown"
+        ],
+        "limitations": [
+          "Documentation evidence; not executed against an installed host.",
+          "Applies to the documented release behaviour on the fetch date."
+        ]
+      }
+    },
+    {
+      "id": "agent-hooks.copilot.hook-config-location",
+      "section": "agent-hooks",
+      "capability": "hook-config-location",
+      "status": "reported",
+      "components": [
+        {
+          "name": "Copilot CLI",
+          "version": "unknown"
+        },
+        {
+          "name": "hook script",
+          "version": "unknown"
+        }
+      ],
+      "symptom": "Hooks written to the wrong file or with the wrong event names never fire.",
+      "cause": "Each host reads its own config locations, format and event names.",
+      "remediation": "Check this record's result before relying on the capability; degrade to another event when support is no.",
+      "owner": "hook script author; host adapter",
+      "evidence": [
+        {
+          "source": "https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-hooks-reference",
+          "observed_at": "2026-10-28",
+          "scope": "Copilot CLI official hooks documentation, undated, fetched 2026-10-28; no version stated",
+          "result": "JSON with version 1 in .github/hooks/*.json, .github/copilot/settings(.local).json, .claude/settings(.local).json, ~/.copilot/hooks/*.json and ~/.copilot/settings.json. PascalCase event names select a Claude-compatible payload."
+        }
+      ],
+      "validity": {
+        "workspace": "not-applicable",
+        "snapshot": "documentation fetched 2026-10-28",
+        "environment": "macOS; host defaults",
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:yes",
+          "event:sessionStart",
+          "event:userPromptSubmitted",
+          "event:preToolUse",
+          "event:postToolUse",
+          "event:permissionRequest",
+          "event:preCompact",
+          "event:agentStop",
+          "event:subagentStart",
+          "event:subagentStop",
+          "event:sessionEnd",
+          "event:errorOccurred",
+          "event:SessionStart",
+          "event:UserPromptSubmit",
+          "event:PreToolUse",
+          "event:PostToolUse",
+          "event:PreCompact",
+          "event:Stop",
+          "event:SubagentStop",
+          "event:SessionEnd"
+        ],
+        "limitations": [
+          "Documentation evidence; not executed against an installed host.",
+          "PascalCase compatibility names beyond the documented roles are not established."
+        ]
+      }
+    },
+    {
+      "id": "agent-hooks.cursor.session-start-context-inject",
+      "section": "agent-hooks",
+      "capability": "session-start-context-inject",
+      "status": "reported",
+      "components": [
+        {
+          "name": "Cursor",
+          "version": "unknown"
+        },
+        {
+          "name": "hook script",
+          "version": "unknown"
+        }
+      ],
+      "symptom": "Session-start hook output does not reach the model.",
+      "cause": "Hosts differ in whether and how session-start output is injected.",
+      "remediation": "Check this record's result before relying on the capability; degrade to another event when support is no.",
+      "owner": "hook script author; host adapter",
+      "evidence": [
+        {
+          "source": "https://cursor.com/docs/hooks",
+          "observed_at": "2026-10-28",
+          "scope": "Cursor official hooks documentation, undated, fetched 2026-10-28; no version stated",
+          "result": "sessionStart may return additional_context and env; it is fire-and-forget."
+        }
+      ],
+      "validity": {
+        "workspace": "not-applicable",
+        "snapshot": "documentation fetched 2026-10-28",
+        "environment": "macOS; host defaults",
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:yes"
+        ],
+        "limitations": [
+          "Documentation evidence; not executed against an installed host.",
+          "Applies to the documented release behaviour on the fetch date."
+        ]
+      }
+    },
+    {
+      "id": "agent-hooks.cursor.prompt-submit-context-inject",
+      "section": "agent-hooks",
+      "capability": "prompt-submit-context-inject",
+      "status": "reported",
+      "components": [
+        {
+          "name": "Cursor",
+          "version": "unknown"
+        },
+        {
+          "name": "hook script",
+          "version": "unknown"
+        }
+      ],
+      "symptom": "Context printed by a prompt-submit hook is ignored.",
+      "cause": "Hosts differ in whether prompt-time hooks may add context.",
+      "remediation": "Check this record's result before relying on the capability; degrade to another event when support is no.",
+      "owner": "hook script author; host adapter",
+      "evidence": [
+        {
+          "source": "https://cursor.com/docs/hooks",
+          "observed_at": "2026-10-28",
+          "scope": "Cursor official hooks documentation, undated, fetched 2026-10-28; no version stated",
+          "result": "beforeSubmitPrompt output is limited to continue and user_message; it cannot inject context."
+        }
+      ],
+      "validity": {
+        "workspace": "not-applicable",
+        "snapshot": "documentation fetched 2026-10-28",
+        "environment": "macOS; host defaults",
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:no"
+        ],
+        "limitations": [
+          "Documentation evidence; not executed against an installed host.",
+          "Applies to the documented release behaviour on the fetch date."
+        ]
+      }
+    },
+    {
+      "id": "agent-hooks.cursor.turn-end-block-and-continue",
+      "section": "agent-hooks",
+      "capability": "turn-end-block-and-continue",
+      "status": "reported",
+      "components": [
+        {
+          "name": "Cursor",
+          "version": "unknown"
+        },
+        {
+          "name": "hook script",
+          "version": "unknown"
+        }
+      ],
+      "symptom": "A turn-end hook written for session exit runs every turn, or cannot force another turn.",
+      "cause": "Turn-end events fire per agent turn; continuation output differs by host.",
+      "remediation": "Check this record's result before relying on the capability; degrade to another event when support is no.",
+      "owner": "hook script author; host adapter",
+      "evidence": [
+        {
+          "source": "https://cursor.com/docs/hooks",
+          "observed_at": "2026-10-28",
+          "scope": "Cursor official hooks documentation, undated, fetched 2026-10-28; no version stated",
+          "result": "stop may return followup_message, auto-submitted as the next user message, up to loop_limit (default 5). Forum reports say cloud agents skip stop."
+        }
+      ],
+      "validity": {
+        "workspace": "not-applicable",
+        "snapshot": "documentation fetched 2026-10-28",
+        "environment": "macOS; host defaults",
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:partial"
+        ],
+        "limitations": [
+          "Documentation evidence; not executed against an installed host.",
+          "Applies to the documented release behaviour on the fetch date."
+        ]
+      }
+    },
+    {
+      "id": "agent-hooks.cursor.precompact-event",
+      "section": "agent-hooks",
+      "capability": "precompact-event",
+      "status": "reported",
+      "components": [
+        {
+          "name": "Cursor",
+          "version": "unknown"
+        },
+        {
+          "name": "hook script",
+          "version": "unknown"
+        }
+      ],
+      "symptom": "A pre-compaction checkpoint hook never runs.",
+      "cause": "Not every host exposes a compaction event.",
+      "remediation": "Check this record's result before relying on the capability; degrade to another event when support is no.",
+      "owner": "hook script author; host adapter",
+      "evidence": [
+        {
+          "source": "https://cursor.com/docs/hooks",
+          "observed_at": "2026-10-28",
+          "scope": "Cursor official hooks documentation, undated, fetched 2026-10-28; no version stated",
+          "result": "preCompact is observational and carries context_usage_percent, context_tokens and context_window_size."
+        }
+      ],
+      "validity": {
+        "workspace": "not-applicable",
+        "snapshot": "documentation fetched 2026-10-28",
+        "environment": "macOS; host defaults",
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:yes"
+        ],
+        "limitations": [
+          "Documentation evidence; not executed against an installed host.",
+          "Applies to the documented release behaviour on the fetch date."
+        ]
+      }
+    },
+    {
+      "id": "agent-hooks.cursor.session-end-event",
+      "section": "agent-hooks",
+      "capability": "session-end-event",
+      "status": "reported",
+      "components": [
+        {
+          "name": "Cursor",
+          "version": "unknown"
+        },
+        {
+          "name": "hook script",
+          "version": "unknown"
+        }
+      ],
+      "symptom": "Session-exit cleanup never runs or runs at an unexpected time.",
+      "cause": "Not every host exposes a session-end event; triggers differ.",
+      "remediation": "Check this record's result before relying on the capability; degrade to another event when support is no.",
+      "owner": "hook script author; host adapter",
+      "evidence": [
+        {
+          "source": "https://cursor.com/docs/hooks",
+          "observed_at": "2026-10-28",
+          "scope": "Cursor official hooks documentation, undated, fetched 2026-10-28; no version stated",
+          "result": "sessionEnd fires with reason, duration_ms and final_status."
+        }
+      ],
+      "validity": {
+        "workspace": "not-applicable",
+        "snapshot": "documentation fetched 2026-10-28",
+        "environment": "macOS; host defaults",
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:yes"
+        ],
+        "limitations": [
+          "Documentation evidence; not executed against an installed host.",
+          "Applies to the documented release behaviour on the fetch date."
+        ]
+      }
+    },
+    {
+      "id": "agent-hooks.cursor.transcript-token-usage",
+      "section": "agent-hooks",
+      "capability": "transcript-token-usage",
+      "status": "verified",
+      "components": [
+        {
+          "name": "Cursor",
+          "version": "unknown"
+        },
+        {
+          "name": "hook script",
+          "version": "unknown"
+        }
+      ],
+      "symptom": "A hook cannot measure context usage from the transcript.",
+      "cause": "Transcript formats and usage fields differ by host.",
+      "remediation": "Check this record's result before relying on the capability; degrade to another event when support is no.",
+      "owner": "hook script author; host adapter",
+      "evidence": [
+        {
+          "source": "local Cursor agent transcript JSONL under the Cursor projects directory",
+          "observed_at": "2026-10-28",
+          "scope": "Cursor agent transcripts on one Mac; Cursor version not recorded",
+          "result": "Sampled agent transcript records carry role and message content only, with no usage or model."
+        }
+      ],
+      "validity": {
+        "workspace": "not-applicable",
+        "snapshot": "local files read 2026-10-28",
+        "environment": "macOS; host defaults",
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:no"
+        ],
+        "limitations": [
+          "Read-only inspection of local files on one Mac; not a documented contract.",
+          "Applies to the named host version only."
+        ]
+      }
+    },
+    {
+      "id": "agent-hooks.cursor.transcript-context-window",
+      "section": "agent-hooks",
+      "capability": "transcript-context-window",
+      "status": "reported",
+      "components": [
+        {
+          "name": "Cursor",
+          "version": "unknown"
+        },
+        {
+          "name": "hook script",
+          "version": "unknown"
+        }
+      ],
+      "symptom": "A hook cannot read the model context window and must use another source.",
+      "cause": "Few transcripts record the context window size.",
+      "remediation": "Check this record's result before relying on the capability; degrade to another event when support is no.",
+      "owner": "hook script author; host adapter",
+      "evidence": [
+        {
+          "source": "https://cursor.com/docs/hooks",
+          "observed_at": "2026-10-28",
+          "scope": "Cursor official hooks documentation, undated, fetched 2026-10-28; no version stated",
+          "result": "The window appears only in the preCompact hook payload (context_window_size), not in the transcript."
+        }
+      ],
+      "validity": {
+        "workspace": "not-applicable",
+        "snapshot": "documentation fetched 2026-10-28",
+        "environment": "macOS; host defaults",
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:partial"
+        ],
+        "limitations": [
+          "Documentation evidence; not executed against an installed host.",
+          "Applies to the documented release behaviour on the fetch date."
+        ]
+      }
+    },
+    {
+      "id": "agent-hooks.cursor.hook-config-location",
+      "section": "agent-hooks",
+      "capability": "hook-config-location",
+      "status": "reported",
+      "components": [
+        {
+          "name": "Cursor",
+          "version": "unknown"
+        },
+        {
+          "name": "hook script",
+          "version": "unknown"
+        }
+      ],
+      "symptom": "Hooks written to the wrong file or with the wrong event names never fire.",
+      "cause": "Each host reads its own config locations, format and event names.",
+      "remediation": "Check this record's result before relying on the capability; degrade to another event when support is no.",
+      "owner": "hook script author; host adapter",
+      "evidence": [
+        {
+          "source": "https://cursor.com/docs/hooks",
+          "observed_at": "2026-10-28",
+          "scope": "Cursor official hooks documentation, undated, fetched 2026-10-28; no version stated",
+          "result": "hooks.json with version 1 at ~/.cursor/hooks.json, <root>/.cursor/hooks.json, team dashboard and enterprise paths. Event names are camelCase and differ from Claude Code."
+        }
+      ],
+      "validity": {
+        "workspace": "not-applicable",
+        "snapshot": "documentation fetched 2026-10-28",
+        "environment": "macOS; host defaults",
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:yes",
+          "event:sessionStart",
+          "event:sessionEnd",
+          "event:beforeSubmitPrompt",
+          "event:beforeShellExecution",
+          "event:afterShellExecution",
+          "event:beforeMCPExecution",
+          "event:afterMCPExecution",
+          "event:beforeReadFile",
+          "event:afterFileEdit",
+          "event:afterAgentResponse",
+          "event:afterAgentThought",
+          "event:preCompact",
+          "event:stop",
+          "event:subagentStart",
+          "event:subagentStop",
+          "event:workspaceOpen"
+        ],
+        "limitations": [
+          "Documentation evidence; not executed against an installed host.",
+          "Event list beyond the documented roles is unverified; CLI coverage is unclear."
+        ]
+      }
+    },
+    {
+      "id": "agent-hooks.antigravity.session-start-context-inject",
+      "section": "agent-hooks",
+      "capability": "session-start-context-inject",
+      "status": "reported",
+      "components": [
+        {
+          "name": "Antigravity",
+          "version": "unknown"
+        },
+        {
+          "name": "hook script",
+          "version": "unknown"
+        }
+      ],
+      "symptom": "Session-start hook output does not reach the model.",
+      "cause": "Hosts differ in whether and how session-start output is injected.",
+      "remediation": "Check this record's result before relying on the capability; degrade to another event when support is no.",
+      "owner": "hook script author; host adapter",
+      "evidence": [
+        {
+          "source": "https://antigravity.google/docs/hooks?tab=cli",
+          "observed_at": "2026-10-28",
+          "scope": "Antigravity official hooks documentation, undated, fetched 2026-10-28; no version stated",
+          "result": "SessionStart may return injectSteps (systemMessage, userMessage, ephemeralMessage, toolCall)."
+        }
+      ],
+      "validity": {
+        "workspace": "not-applicable",
+        "snapshot": "documentation fetched 2026-10-28",
+        "environment": "macOS; host defaults",
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:yes"
+        ],
+        "limitations": [
+          "Documentation evidence; not executed against an installed host.",
+          "Applies to the documented release behaviour on the fetch date."
+        ]
+      }
+    },
+    {
+      "id": "agent-hooks.antigravity.prompt-submit-context-inject",
+      "section": "agent-hooks",
+      "capability": "prompt-submit-context-inject",
+      "status": "reported",
+      "components": [
+        {
+          "name": "Antigravity",
+          "version": "unknown"
+        },
+        {
+          "name": "hook script",
+          "version": "unknown"
+        }
+      ],
+      "symptom": "Context printed by a prompt-submit hook is ignored.",
+      "cause": "Hosts differ in whether prompt-time hooks may add context.",
+      "remediation": "Check this record's result before relying on the capability; degrade to another event when support is no.",
+      "owner": "hook script author; host adapter",
+      "evidence": [
+        {
+          "source": "https://antigravity.google/docs/hooks?tab=cli",
+          "observed_at": "2026-10-28",
+          "scope": "Antigravity official hooks documentation, undated, fetched 2026-10-28; no version stated",
+          "result": "No prompt-submit event; PreInvocation runs before each model call and may injectSteps."
+        }
+      ],
+      "validity": {
+        "workspace": "not-applicable",
+        "snapshot": "documentation fetched 2026-10-28",
+        "environment": "macOS; host defaults",
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:no"
+        ],
+        "limitations": [
+          "Documentation evidence; not executed against an installed host.",
+          "Applies to the documented release behaviour on the fetch date."
+        ]
+      }
+    },
+    {
+      "id": "agent-hooks.antigravity.turn-end-block-and-continue",
+      "section": "agent-hooks",
+      "capability": "turn-end-block-and-continue",
+      "status": "reported",
+      "components": [
+        {
+          "name": "Antigravity",
+          "version": "unknown"
+        },
+        {
+          "name": "hook script",
+          "version": "unknown"
+        }
+      ],
+      "symptom": "A turn-end hook written for session exit runs every turn, or cannot force another turn.",
+      "cause": "Turn-end events fire per agent turn; continuation output differs by host.",
+      "remediation": "Check this record's result before relying on the capability; degrade to another event when support is no.",
+      "owner": "hook script author; host adapter",
+      "evidence": [
+        {
+          "source": "https://antigravity.google/docs/hooks?tab=cli",
+          "observed_at": "2026-10-28",
+          "scope": "Antigravity official hooks documentation, undated, fetched 2026-10-28; no version stated",
+          "result": "Stop may return decision continue; reason is injected as a system message."
+        }
+      ],
+      "validity": {
+        "workspace": "not-applicable",
+        "snapshot": "documentation fetched 2026-10-28",
+        "environment": "macOS; host defaults",
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:yes"
+        ],
+        "limitations": [
+          "Documentation evidence; not executed against an installed host.",
+          "Applies to the documented release behaviour on the fetch date."
+        ]
+      }
+    },
+    {
+      "id": "agent-hooks.antigravity.precompact-event",
+      "section": "agent-hooks",
+      "capability": "precompact-event",
+      "status": "reported",
+      "components": [
+        {
+          "name": "Antigravity",
+          "version": "unknown"
+        },
+        {
+          "name": "hook script",
+          "version": "unknown"
+        }
+      ],
+      "symptom": "A pre-compaction checkpoint hook never runs.",
+      "cause": "Not every host exposes a compaction event.",
+      "remediation": "Check this record's result before relying on the capability; degrade to another event when support is no.",
+      "owner": "hook script author; host adapter",
+      "evidence": [
+        {
+          "source": "https://antigravity.google/docs/hooks?tab=cli",
+          "observed_at": "2026-10-28",
+          "scope": "Antigravity official hooks documentation, undated, fetched 2026-10-28; no version stated",
+          "result": "No compaction event is documented."
+        }
+      ],
+      "validity": {
+        "workspace": "not-applicable",
+        "snapshot": "documentation fetched 2026-10-28",
+        "environment": "macOS; host defaults",
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:no"
+        ],
+        "limitations": [
+          "Documentation evidence; not executed against an installed host.",
+          "Applies to the documented release behaviour on the fetch date."
+        ]
+      }
+    },
+    {
+      "id": "agent-hooks.antigravity.session-end-event",
+      "section": "agent-hooks",
+      "capability": "session-end-event",
+      "status": "reported",
+      "components": [
+        {
+          "name": "Antigravity",
+          "version": "unknown"
+        },
+        {
+          "name": "hook script",
+          "version": "unknown"
+        }
+      ],
+      "symptom": "Session-exit cleanup never runs or runs at an unexpected time.",
+      "cause": "Not every host exposes a session-end event; triggers differ.",
+      "remediation": "Check this record's result before relying on the capability; degrade to another event when support is no.",
+      "owner": "hook script author; host adapter",
+      "evidence": [
+        {
+          "source": "https://antigravity.google/docs/hooks?tab=cli",
+          "observed_at": "2026-10-28",
+          "scope": "Antigravity official hooks documentation, undated, fetched 2026-10-28; no version stated",
+          "result": "No session-end event is documented."
+        }
+      ],
+      "validity": {
+        "workspace": "not-applicable",
+        "snapshot": "documentation fetched 2026-10-28",
+        "environment": "macOS; host defaults",
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:no"
+        ],
+        "limitations": [
+          "Documentation evidence; not executed against an installed host.",
+          "Applies to the documented release behaviour on the fetch date."
+        ]
+      }
+    },
+    {
+      "id": "agent-hooks.antigravity.hook-config-location",
+      "section": "agent-hooks",
+      "capability": "hook-config-location",
+      "status": "reported",
+      "components": [
+        {
+          "name": "Antigravity",
+          "version": "unknown"
+        },
+        {
+          "name": "hook script",
+          "version": "unknown"
+        }
+      ],
+      "symptom": "Hooks written to the wrong file or with the wrong event names never fire.",
+      "cause": "Each host reads its own config locations, format and event names.",
+      "remediation": "Check this record's result before relying on the capability; degrade to another event when support is no.",
+      "owner": "hook script author; host adapter",
+      "evidence": [
+        {
+          "source": "https://antigravity.google/docs/hooks?tab=cli",
+          "observed_at": "2026-10-28",
+          "scope": "Antigravity official hooks documentation, undated, fetched 2026-10-28; no version stated",
+          "result": "Workspace .agents/hooks.json and global ~/.gemini/config/hooks.json; the CLI also loads plugin hooks.json. Exit-code semantics are not documented."
+        }
+      ],
+      "validity": {
+        "workspace": "not-applicable",
+        "snapshot": "documentation fetched 2026-10-28",
+        "environment": "macOS; host defaults",
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:yes",
+          "event:SessionStart",
+          "event:PreInvocation",
+          "event:PostInvocation",
+          "event:Stop",
+          "event:PreToolUse",
+          "event:PostToolUse"
+        ],
+        "limitations": [
+          "Documentation evidence; not executed against an installed host.",
+          "Event list beyond the documented roles is unverified."
+        ]
+      }
+    },
+    {
+      "id": "agent-hooks.opencode.hook-config-location",
+      "section": "agent-hooks",
+      "capability": "hook-config-location",
+      "status": "reported",
+      "components": [
+        {
+          "name": "OpenCode",
+          "version": "unknown"
+        },
+        {
+          "name": "hook script",
+          "version": "unknown"
+        }
+      ],
+      "symptom": "Hooks written to the wrong file or with the wrong event names never fire.",
+      "cause": "Each host reads its own config locations, format and event names.",
+      "remediation": "Check this record's result before relying on the capability; degrade to another event when support is no.",
+      "owner": "hook script author; host adapter",
+      "evidence": [
+        {
+          "source": "https://opencode.ai/docs/plugins/",
+          "observed_at": "2026-10-28",
+          "scope": "OpenCode plugins page, last updated 2026-10-27, fetched 2026-10-28",
+          "result": "TypeScript plugins (Bun) in .opencode/plugins/, ~/.config/opencode/plugins/ or npm names in opencode.json; no shell hook file."
+        }
+      ],
+      "validity": {
+        "workspace": "not-applicable",
+        "snapshot": "documentation fetched 2026-10-28",
+        "environment": "macOS; host defaults",
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:yes"
+        ],
+        "limitations": [
+          "Documentation evidence; not executed against an installed host.",
+          "Applies to the documented release behaviour on the fetch date."
+        ]
+      }
+    },
+    {
+      "id": "agent-hooks.opencode.turn-end-block-and-continue",
+      "section": "agent-hooks",
+      "capability": "turn-end-block-and-continue",
+      "status": "reported",
+      "components": [
+        {
+          "name": "OpenCode",
+          "version": "unknown"
+        },
+        {
+          "name": "hook script",
+          "version": "unknown"
+        }
+      ],
+      "symptom": "A turn-end hook written for session exit runs every turn, or cannot force another turn.",
+      "cause": "Turn-end events fire per agent turn; continuation output differs by host.",
+      "remediation": "Check this record's result before relying on the capability; degrade to another event when support is no.",
+      "owner": "hook script author; host adapter",
+      "evidence": [
+        {
+          "source": "https://opencode.ai/docs/plugins/",
+          "observed_at": "2026-10-28",
+          "scope": "OpenCode plugins page, last updated 2026-10-27, fetched 2026-10-28",
+          "result": "session.idle is a notification with no documented continue return."
+        }
+      ],
+      "validity": {
+        "workspace": "not-applicable",
+        "snapshot": "documentation fetched 2026-10-28",
+        "environment": "macOS; host defaults",
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:no"
+        ],
+        "limitations": [
+          "Documentation evidence; not executed against an installed host.",
+          "Applies to the documented release behaviour on the fetch date."
+        ]
+      }
+    },
+    {
+      "id": "agent-hooks.opencode.precompact-event",
+      "section": "agent-hooks",
+      "capability": "precompact-event",
+      "status": "reported",
+      "components": [
+        {
+          "name": "OpenCode",
+          "version": "unknown"
+        },
+        {
+          "name": "hook script",
+          "version": "unknown"
+        }
+      ],
+      "symptom": "A pre-compaction checkpoint hook never runs.",
+      "cause": "Not every host exposes a compaction event.",
+      "remediation": "Check this record's result before relying on the capability; degrade to another event when support is no.",
+      "owner": "hook script author; host adapter",
+      "evidence": [
+        {
+          "source": "https://opencode.ai/docs/plugins/",
+          "observed_at": "2026-10-28",
+          "scope": "OpenCode plugins page, last updated 2026-10-27, fetched 2026-10-28",
+          "result": "experimental.session.compacting may push context or replace the prompt; session.compacted follows."
+        }
+      ],
+      "validity": {
+        "workspace": "not-applicable",
+        "snapshot": "documentation fetched 2026-10-28",
+        "environment": "macOS; host defaults",
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:yes"
+        ],
+        "limitations": [
+          "Documentation evidence; not executed against an installed host.",
+          "Applies to the documented release behaviour on the fetch date."
+        ]
+      }
+    },
+    {
+      "id": "agent-hooks.opencode.transcript-token-usage",
+      "section": "agent-hooks",
+      "capability": "transcript-token-usage",
+      "status": "verified",
+      "components": [
+        {
+          "name": "OpenCode",
+          "version": "unknown"
+        },
+        {
+          "name": "hook script",
+          "version": "unknown"
+        }
+      ],
+      "symptom": "A hook cannot measure context usage from the transcript.",
+      "cause": "Transcript formats and usage fields differ by host.",
+      "remediation": "Check this record's result before relying on the capability; degrade to another event when support is no.",
+      "owner": "hook script author; host adapter",
+      "evidence": [
+        {
+          "source": "local OpenCode SQLite database",
+          "observed_at": "2026-10-28",
+          "scope": "OpenCode database on one Mac; OpenCode version not recorded",
+          "result": "Local SQLite message data carries tokens (input, output, reasoning, cache) plus modelID and providerID."
+        }
+      ],
+      "validity": {
+        "workspace": "not-applicable",
+        "snapshot": "local files read 2026-10-28",
+        "environment": "macOS; host defaults",
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:yes"
+        ],
+        "limitations": [
+          "Read-only inspection of local files on one Mac; not a documented contract.",
+          "Applies to the named host version only."
+        ]
+      }
+    },
+    {
+      "id": "agent-hooks.amp.hook-config-location",
+      "section": "agent-hooks",
+      "capability": "hook-config-location",
+      "status": "reported",
+      "components": [
+        {
+          "name": "Amp",
+          "version": "unknown"
+        },
+        {
+          "name": "hook script",
+          "version": "unknown"
+        }
+      ],
+      "symptom": "Hooks written to the wrong file or with the wrong event names never fire.",
+      "cause": "Each host reads its own config locations, format and event names.",
+      "remediation": "Check this record's result before relying on the capability; degrade to another event when support is no.",
+      "owner": "hook script author; host adapter",
+      "evidence": [
+        {
+          "source": "https://ampcode.com/docs/plugin-api",
+          "observed_at": "2026-10-28",
+          "scope": "Amp official hooks documentation, undated, fetched 2026-10-28; no version stated",
+          "result": "TypeScript plugins run by Bun in .amp/plugins/ or ~/.config/amp/plugins/; some APIs are experimental."
+        }
+      ],
+      "validity": {
+        "workspace": "not-applicable",
+        "snapshot": "documentation fetched 2026-10-28",
+        "environment": "macOS; host defaults",
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:yes"
+        ],
+        "limitations": [
+          "Documentation evidence; not executed against an installed host.",
+          "Applies to the documented release behaviour on the fetch date."
+        ]
+      }
+    },
+    {
+      "id": "agent-hooks.amp.prompt-submit-context-inject",
+      "section": "agent-hooks",
+      "capability": "prompt-submit-context-inject",
+      "status": "reported",
+      "components": [
+        {
+          "name": "Amp",
+          "version": "unknown"
+        },
+        {
+          "name": "hook script",
+          "version": "unknown"
+        }
+      ],
+      "symptom": "Context printed by a prompt-submit hook is ignored.",
+      "cause": "Hosts differ in whether prompt-time hooks may add context.",
+      "remediation": "Check this record's result before relying on the capability; degrade to another event when support is no.",
+      "owner": "hook script author; host adapter",
+      "evidence": [
+        {
+          "source": "https://ampcode.com/docs/plugin-api",
+          "observed_at": "2026-10-28",
+          "scope": "Amp official hooks documentation, undated, fetched 2026-10-28; no version stated",
+          "result": "agent.start may return a message to add to the turn."
+        }
+      ],
+      "validity": {
+        "workspace": "not-applicable",
+        "snapshot": "documentation fetched 2026-10-28",
+        "environment": "macOS; host defaults",
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:yes"
+        ],
+        "limitations": [
+          "Documentation evidence; not executed against an installed host.",
+          "Applies to the documented release behaviour on the fetch date."
+        ]
+      }
+    },
+    {
+      "id": "agent-hooks.amp.turn-end-block-and-continue",
+      "section": "agent-hooks",
+      "capability": "turn-end-block-and-continue",
+      "status": "reported",
+      "components": [
+        {
+          "name": "Amp",
+          "version": "unknown"
+        },
+        {
+          "name": "hook script",
+          "version": "unknown"
+        }
+      ],
+      "symptom": "A turn-end hook written for session exit runs every turn, or cannot force another turn.",
+      "cause": "Turn-end events fire per agent turn; continuation output differs by host.",
+      "remediation": "Check this record's result before relying on the capability; degrade to another event when support is no.",
+      "owner": "hook script author; host adapter",
+      "evidence": [
+        {
+          "source": "https://ampcode.com/docs/plugin-api",
+          "observed_at": "2026-10-28",
+          "scope": "Amp official hooks documentation, undated, fetched 2026-10-28; no version stated",
+          "result": "agent.end may return action continue with userMessage."
+        }
+      ],
+      "validity": {
+        "workspace": "not-applicable",
+        "snapshot": "documentation fetched 2026-10-28",
+        "environment": "macOS; host defaults",
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:yes"
+        ],
+        "limitations": [
+          "Documentation evidence; not executed against an installed host.",
+          "Applies to the documented release behaviour on the fetch date."
+        ]
+      }
+    },
+    {
+      "id": "agent-hooks.amp.transcript-token-usage",
+      "section": "agent-hooks",
+      "capability": "transcript-token-usage",
+      "status": "reported",
+      "components": [
+        {
+          "name": "Amp",
+          "version": "unknown"
+        },
+        {
+          "name": "hook script",
+          "version": "unknown"
+        }
+      ],
+      "symptom": "A hook cannot measure context usage from the transcript.",
+      "cause": "Transcript formats and usage fields differ by host.",
+      "remediation": "Check this record's result before relying on the capability; degrade to another event when support is no.",
+      "owner": "hook script author; host adapter",
+      "evidence": [
+        {
+          "source": "https://ampcode.com/docs/plugin-api",
+          "observed_at": "2026-10-28",
+          "scope": "Amp official hooks documentation, undated, fetched 2026-10-28; no version stated",
+          "result": "The plugin event map exposes no token usage or context window."
+        }
+      ],
+      "validity": {
+        "workspace": "not-applicable",
+        "snapshot": "documentation fetched 2026-10-28",
+        "environment": "macOS; host defaults",
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:no"
+        ],
+        "limitations": [
+          "Documentation evidence; not executed against an installed host.",
+          "Applies to the documented release behaviour on the fetch date."
+        ]
+      }
+    },
+    {
+      "id": "agent-hooks.cline.hook-config-location",
+      "section": "agent-hooks",
+      "capability": "hook-config-location",
+      "status": "reported",
+      "components": [
+        {
+          "name": "Cline",
+          "version": "unknown"
+        },
+        {
+          "name": "hook script",
+          "version": "unknown"
+        }
+      ],
+      "symptom": "Hooks written to the wrong file or with the wrong event names never fire.",
+      "cause": "Each host reads its own config locations, format and event names.",
+      "remediation": "Check this record's result before relying on the capability; degrade to another event when support is no.",
+      "owner": "hook script author; host adapter",
+      "evidence": [
+        {
+          "source": "https://docs.cline.bot/sdk/plugins.md",
+          "observed_at": "2026-10-28",
+          "scope": "Cline official hooks documentation, undated, fetched 2026-10-28; no version stated",
+          "result": "TypeScript AgentPlugin modules via pluginPaths; legacy shell hook docs now redirect here and their status is unknown."
+        }
+      ],
+      "validity": {
+        "workspace": "not-applicable",
+        "snapshot": "documentation fetched 2026-10-28",
+        "environment": "macOS; host defaults",
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:yes"
+        ],
+        "limitations": [
+          "Documentation evidence; not executed against an installed host.",
+          "Applies to the documented release behaviour on the fetch date."
+        ]
+      }
+    },
+    {
+      "id": "agent-hooks.cline.prompt-submit-context-inject",
+      "section": "agent-hooks",
+      "capability": "prompt-submit-context-inject",
+      "status": "reported",
+      "components": [
+        {
+          "name": "Cline",
+          "version": "unknown"
+        },
+        {
+          "name": "hook script",
+          "version": "unknown"
+        }
+      ],
+      "symptom": "Context printed by a prompt-submit hook is ignored.",
+      "cause": "Hosts differ in whether prompt-time hooks may add context.",
+      "remediation": "Check this record's result before relying on the capability; degrade to another event when support is no.",
+      "owner": "hook script author; host adapter",
+      "evidence": [
+        {
+          "source": "https://docs.cline.bot/sdk/plugins.md",
+          "observed_at": "2026-10-28",
+          "scope": "Cline official hooks documentation, undated, fetched 2026-10-28; no version stated",
+          "result": "beforeRun may return appendContext."
+        }
+      ],
+      "validity": {
+        "workspace": "not-applicable",
+        "snapshot": "documentation fetched 2026-10-28",
+        "environment": "macOS; host defaults",
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:yes"
+        ],
+        "limitations": [
+          "Documentation evidence; not executed against an installed host.",
+          "Applies to the documented release behaviour on the fetch date."
+        ]
+      }
+    },
+    {
+      "id": "agent-hooks.sdk.hook-config-location",
+      "section": "agent-hooks",
+      "capability": "hook-config-location",
+      "status": "reported",
+      "components": [
+        {
+          "name": "Claude Agent SDK",
+          "version": "unknown"
+        },
+        {
+          "name": "hook script",
+          "version": "unknown"
+        }
+      ],
+      "symptom": "Hooks written to the wrong file or with the wrong event names never fire.",
+      "cause": "Each host reads its own config locations, format and event names.",
+      "remediation": "Check this record's result before relying on the capability; degrade to another event when support is no.",
+      "owner": "hook script author; host adapter",
+      "evidence": [
+        {
+          "source": "https://code.claude.com/docs/en/agent-sdk/hooks",
+          "observed_at": "2026-10-28",
+          "scope": "Claude Agent SDK official hooks documentation, undated, fetched 2026-10-28; no version stated",
+          "result": "In-process callbacks in options.hooks plus settings-file shell hooks when settingSources include them; SessionStart and SessionEnd callbacks are TypeScript-only."
+        }
+      ],
+      "validity": {
+        "workspace": "not-applicable",
+        "snapshot": "documentation fetched 2026-10-28",
+        "environment": "macOS; host defaults",
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:yes"
+        ],
+        "limitations": [
+          "Documentation evidence; not executed against an installed host.",
+          "Applies to the documented release behaviour on the fetch date."
+        ]
+      }
     }
   ]
 }

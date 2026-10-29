@@ -6,6 +6,7 @@
 mod acp;
 mod compat;
 mod daemon;
+mod hooks;
 mod lsp;
 mod mcp;
 mod query;
@@ -26,7 +27,8 @@ USAGE
   rosslabs-lsp acp doctor [--agent ID]... [--cwd DIR] [--timeout SECS] [--json] [--first-token] [--registry PATH|URL]
   rosslabs-lsp compat record <registry.json> <record.json>
   rosslabs-lsp compat sections
-  rosslabs-lsp compat <registry.json> [--section NAME] [--component NAME]
+  rosslabs-lsp compat <registry.json> [--section NAME] [--component NAME] [--stale-days N]
+  rosslabs-lsp hooks doctor [--host ID] [--json] [--stale-days N] [--cwd DIR] [--registry PATH]
 
 OPTIONS
   --raw     emit untouched LSP payloads instead of compact locations
@@ -49,6 +51,11 @@ ACP
                codex, goose, kiro): version vs registry, initialize and
                session/new timings. --first-token also times one tiny prompt
                (costs tokens; never run by default).
+
+HOOKS
+  hooks doctor read agent hook configs (claude, codex, gemini, cursor, copilot,
+               antigravity) and check events, outputs and versions against the
+               agent-hooks compatibility records. Read-only; secrets redacted.
 
 MODES
   mcp       serve the same queries over MCP stdio (for Claude Code, Codex, ...)
@@ -99,6 +106,7 @@ fn run_as(invoked_as: &str, args: &[String]) -> Result<String, String> {
             acp::cli(&args[1..])
         }
         "compat" => pretty(&compat::cli(&args[1..])?),
+        "hooks" => hooks::cli(&args[1..]),
         verb => {
             let kind =
                 Kind::parse(verb).ok_or_else(|| format!("unknown query '{verb}' (try --help)"))?;
