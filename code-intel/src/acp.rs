@@ -434,7 +434,7 @@ fn registry_launch(entry: &Value, bin: &str, args: &[String]) -> (Value, Option<
 // ---------------------------------------------------------------- version
 
 /// The first token that looks like a version, e.g. "goose 1.2.3" → "1.2.3".
-fn extract_version(text: &str) -> Option<String> {
+pub(crate) fn extract_version(text: &str) -> Option<String> {
     text.split_whitespace()
         .map(|t| t.trim_matches(|c: char| c == ',' || c == '(' || c == ')'))
         .find(|t| {
@@ -475,7 +475,7 @@ pub fn compare_versions(installed: Option<&str>, registry: Option<&str>) -> &'st
     }
 }
 
-fn run_version(cmd: &[String], timeout: Duration) -> Option<String> {
+pub(crate) fn run_version(cmd: &[String], timeout: Duration) -> Option<String> {
     let (prog, rest) = cmd.split_first()?;
     let mut child = Command::new(prog)
         .args(rest)

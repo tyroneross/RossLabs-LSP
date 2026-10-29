@@ -14,6 +14,7 @@ pub const SECTIONS: &[&str] = &[
     "build-dependencies",
     "ui-contracts",
     "security-trust",
+    "agent-hooks",
 ];
 
 pub fn sections() -> Value {
@@ -93,13 +94,94 @@ pub fn validate(doc: &Value) -> Result<(), String> {
     Ok(())
 }
 
-pub fn query(path: &str, section: Option<&str>, component: Option<&str>) -> Result<Value, String> {
+/// Days since 1970-01-01 for a `YYYY-MM-DD` prefix; None when malformed.
+pub fn civil_days(date: &str) -> Option<i64> {
+    let mut parts = date.get(..10)?.split('-');
+    let y: i64 = parts.next()?.parse().ok()?;
+    let m: i64 = parts.next()?.parse().ok()?;
+    let d: i64 = parts.next()?.parse().ok()?;
+    if !(1..=12).contains(&m) || !(1..=31).contains(&d) {
+        return None;
+    }
+    // Howard Hinnant's days_from_civil.
+    let y = if m <= 2 { y - 1 } else { y };
+    let era = y.div_euclid(400);
+    let yoe = y - era * 400;
+    let doy = (153 * (if m > 2 { m - 3 } else { m + 9 }) + 2) / 5 + d - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    Some(era * 146_097 + doe - 719_468)
+}
+
+/// Today in days since the epoch (UTC).
+pub fn today_days() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| (d.as_secs() / 86_400) as i64)
+        .unwrap_or(0)
+}
+
+/// Newest `observed_at` across a record's evidence, if any parses.
+pub fn newest_observed(record: &Value) -> Option<(i64, String)> {
+    record["evidence"]
+        .as_array()?
+        .iter()
+        .filter_map(|e| {
+            let s = e["observed_at"].as_str()?;
+            civil_days(s).map(|d| (d, s.to_string()))
+        })
+        .max_by_key(|(d, _)| *d)
+}
+
+/// Mark each record stale when its newest evidence is older than `days`.
+/// A record with no parseable evidence date is stale: its age is unknown.
+pub fn annotate_stale(records: &mut [Value], days: u64, today: i64) -> usize {
+    let mut stale = 0;
+    for r in records.iter_mut() {
+        let newest = newest_observed(r);
+        let age = newest.as_ref().map(|(d, _)| today - d);
+        let is_stale = age.is_none_or(|a| a > days as i64);
+        stale += usize::from(is_stale);
+        r["freshness"] = json!({
+            "newest_observed_at": newest.map(|(_, s)| s),
+            "age_days": age,
+            "stale": is_stale,
+        });
+    }
+    stale
+}
+
+/// The registry compiled into this binary, used when no path is given.
+pub const EMBEDDED_REGISTRY: &str = include_str!("../../compatibility/registry.json");
+const EMBEDDED_LABEL: &str = "embedded compatibility/registry.json";
+
+pub fn query(
+    path: Option<&str>,
+    section: Option<&str>,
+    component: Option<&str>,
+) -> Result<Value, String> {
+    query_with(path, section, component, None)
+}
+
+pub fn query_with(
+    path: Option<&str>,
+    section: Option<&str>,
+    component: Option<&str>,
+    stale_days: Option<u64>,
+) -> Result<Value, String> {
     if let Some(s) = section {
         if !SECTIONS.contains(&s) {
             return Err(format!("unknown section: {s}"));
         }
     }
-    // Explicit path: no global store, implicit home-directory scan or network reads.
+    let (bytes, path) = match path {
+        Some(p) => (read_registry(p)?, p),
+        None => (EMBEDDED_REGISTRY.as_bytes().to_vec(), EMBEDDED_LABEL),
+    };
+    query_bytes(&bytes, path, section, component, stale_days)
+}
+
+// Explicit path: no global store, implicit home-directory scan or network reads.
+fn read_registry(path: &str) -> Result<Vec<u8>, String> {
     const MAX_BYTES: u64 = 1024 * 1024;
     if !fs::metadata(path)
         .map_err(|e| format!("{path}: {e}"))?
@@ -118,11 +200,21 @@ pub fn query(path: &str, section: Option<&str>, component: Option<&str>) -> Resu
     if bytes.len() as u64 > MAX_BYTES {
         return Err("registry exceeds 1 MiB limit".into());
     }
-    let digest = format!("{:x}", Sha256::digest(&bytes));
+    Ok(bytes)
+}
+
+fn query_bytes(
+    bytes: &[u8],
+    path: &str,
+    section: Option<&str>,
+    component: Option<&str>,
+    stale_days: Option<u64>,
+) -> Result<Value, String> {
+    let digest = format!("{:x}", Sha256::digest(bytes));
     let doc: Value =
-        serde_json::from_slice(&bytes).map_err(|e| format!("invalid registry JSON: {e}"))?;
+        serde_json::from_slice(bytes).map_err(|e| format!("invalid registry JSON: {e}"))?;
     validate(&doc)?;
-    let records: Vec<_> = doc["records"]
+    let mut records: Vec<_> = doc["records"]
         .as_array()
         .unwrap()
         .iter()
@@ -138,11 +230,15 @@ pub fn query(path: &str, section: Option<&str>, component: Option<&str>) -> Resu
         })
         .cloned()
         .collect();
-    Ok(
-        json!({"schema_version": 1, "registry": path, "registry_sha256": digest, "validated": true,
+    let stale = stale_days.map(|days| annotate_stale(&mut records, days, today_days()));
+    let mut out = json!({"schema_version": 1, "registry": path, "registry_sha256": digest, "validated": true,
         "coverage": if records.is_empty() { "unknown" } else { "recorded" },
-        "live_verified": false, "records": records}),
-    )
+        "live_verified": false, "records": records});
+    if let (Some(days), Some(count)) = (stale_days, stale) {
+        out["stale_days"] = json!(days);
+        out["stale_count"] = json!(count);
+    }
+    Ok(out)
 }
 
 /// Append an immutable evidence record. All cooperating writers share a lock.
@@ -266,16 +362,20 @@ pub fn cli(args: &[String]) -> Result<Value, String> {
     if args == ["sections"] {
         return Ok(sections());
     }
-    let path = args.first().filter(|s| !s.starts_with("--")).ok_or(
-        "usage: compat sections | compat <registry.json> [--section NAME] [--component NAME]",
-    )?;
+    // No path: use the registry compiled into this binary.
+    let path = args
+        .first()
+        .filter(|s| !s.starts_with("--"))
+        .map(String::as_str);
     let mut section = None;
     let mut component = None;
-    let mut rest = args[1..].iter();
+    let mut stale = None;
+    let mut rest = args[usize::from(path.is_some())..].iter();
     while let Some(flag) = rest.next() {
         let slot = match flag.as_str() {
             "--section" => &mut section,
             "--component" => &mut component,
+            "--stale-days" => &mut stale,
             _ => return Err(format!("unknown compat option: {flag}")),
         };
         if slot.is_some() {
@@ -287,7 +387,13 @@ pub fn cli(args: &[String]) -> Result<Value, String> {
                 .as_str(),
         );
     }
-    query(path, section, component)
+    let stale_days = stale
+        .map(|s| {
+            s.parse::<u64>()
+                .map_err(|_| format!("--stale-days needs a whole number of days, got '{s}'"))
+        })
+        .transpose()?;
+    query_with(path, section, component, stale_days)
 }
 
 #[cfg(test)]
@@ -349,10 +455,10 @@ mod tests {
     }
     #[test]
     fn real_registry_filtering_preserves_unknown_coverage() {
-        let path = concat!(
+        let path = Some(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/../compatibility/registry.json"
-        );
+        ));
         let all = query(path, None, None).unwrap();
         assert!(!all["records"].as_array().unwrap().is_empty());
         assert_eq!(all["live_verified"], false);
@@ -368,8 +474,48 @@ mod tests {
             1
         );
         assert!(query(path, Some("typo"), None).is_err());
-        assert!(query("/nonexistent/registry.json", None, None).is_err());
+        assert!(query(Some("/nonexistent/registry.json"), None, None).is_err());
+        // No path: the embedded registry answers the same query.
+        let embedded = query(None, Some("terminal-input"), Some("codex")).unwrap();
+        assert_eq!(embedded["records"].as_array().unwrap().len(), 1);
+        assert_eq!(embedded["registry"], EMBEDDED_LABEL);
+        let via_cli = cli(&["--section".into(), "agent-hooks".into()]).unwrap();
+        assert!(!via_cli["records"].as_array().unwrap().is_empty());
     }
+    #[test]
+    fn civil_days_and_stale_annotation() {
+        assert_eq!(civil_days("1970-01-01"), Some(0));
+        assert_eq!(civil_days("2026-10-28"), Some(20_754));
+        assert_eq!(civil_days("2026-13-01"), None);
+        assert_eq!(civil_days("soon"), None);
+        let mut recs = vec![record(), record()];
+        recs[1]["evidence"][0]["observed_at"] = json!("unknown");
+        let today = civil_days("2026-11-30").unwrap();
+        assert_eq!(annotate_stale(&mut recs, 30, today), 2);
+        assert_eq!(recs[0]["freshness"]["age_days"], 59);
+        assert_eq!(annotate_stale(&mut recs[..1], 60, today), 0);
+    }
+
+    #[test]
+    fn agent_hooks_section_validates_and_stale_flag_parses() {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../compatibility/registry.json"
+        );
+        let out = cli(&[
+            path.into(),
+            "--section".into(),
+            "agent-hooks".into(),
+            "--stale-days".into(),
+            "100000".into(),
+        ])
+        .unwrap();
+        assert!(out["records"].as_array().unwrap().len() >= 8);
+        assert_eq!(out["stale_count"], 0);
+        assert!(out["records"][0]["freshness"]["newest_observed_at"].is_string());
+        assert!(cli(&[path.into(), "--stale-days".into(), "x".into()]).is_err());
+    }
+
     #[test]
     fn requires_validity_and_typed_capabilities() {
         let mut doc = json!({"schema_version":1,"records":[record()]});
@@ -382,7 +528,8 @@ mod tests {
     #[test]
     fn cli_rejects_ambiguous_arguments() {
         for args in [
-            vec![],
+            vec!["--section"],
+            vec!["--bad"],
             vec!["x", "--bad"],
             vec!["x", "--section"],
             vec!["x", "--section", "protocols", "--section", "protocols"],
@@ -390,5 +537,7 @@ mod tests {
             assert!(cli(&args.into_iter().map(String::from).collect::<Vec<_>>()).is_err());
         }
         assert!(cli(&["sections".into()]).is_ok());
+        // No arguments reads the embedded registry.
+        assert!(cli(&[]).is_ok());
     }
 }

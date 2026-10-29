@@ -26,3 +26,15 @@ probe, background watcher, installer, updater or runtime repair is included.
 - Record creation uses a cooperating-writer lock, bounded JSON, validation, and
   atomic replacement. This does not serialize edits by unrelated file editors.
 - No automatic remediation, transcript import, or live compatibility promotion.
+
+## Agent hooks section and hooks doctor (2026-10-28)
+
+- Rust suite: 70 library + 8 integration tests passed (78 total; baseline 70).
+- Registry: 56 `agent-hooks` records validate; `compat --section agent-hooks
+  --stale-days 30` returned 56 records, 0 stale.
+- Fixture tests use a temporary HOME and PATH with fake host binaries: an
+  unsupported Gemini `Stop` event, an unpinned `npx` command, a Stop hook named for
+  cleanup, a clean Codex host including enabled plugin hooks, version drift,
+  staleness, Cursor prompt-submit inject, redaction, and an unchanged config file.
+- Real-machine run is read-only. Findings depend on local configs and are not
+  recorded here.

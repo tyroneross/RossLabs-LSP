@@ -124,6 +124,12 @@ fn call_tool(params: &Value) -> Result<Value, String> {
         let query = args.get("query").and_then(Value::as_str).unwrap_or("");
         return Ok(tool_result(&crate::route::lookup(query), false));
     }
+    if name == "hooks_doctor" {
+        return Ok(match crate::hooks::mcp(&args) {
+            Ok(v) => tool_result(&v, false),
+            Err(e) => tool_result(&json!({"error": e}), true),
+        });
+    }
     if name == "compat" {
         let result = (|| {
             let object = args
@@ -135,10 +141,10 @@ fn call_tool(params: &Value) -> Result<Value, String> {
             {
                 return Err("unknown compat argument".into());
             }
-            let registry = args
-                .get("registry")
-                .and_then(Value::as_str)
-                .ok_or("missing 'registry' path")?;
+            if args.get("registry").is_some_and(|v| !v.is_string()) {
+                return Err("registry must be a string".into());
+            }
+            let registry = args.get("registry").and_then(Value::as_str);
             for key in ["section", "component"] {
                 if args.get(key).is_some_and(|v| !v.is_string()) {
                     return Err(format!("{key} must be a string"));
@@ -229,10 +235,20 @@ fn tool_list() -> Vec<Value> {
             "name":"compat",
             "description":"Read validated component compatibility evidence. This does not probe live compatibility or execute remedies. Empty coverage means unknown.",
             "inputSchema":{"type":"object","properties":{
-                "registry":{"type":"string","description":"Explicit path to a compatibility registry JSON file"},
+                "registry":{"type":"string","description":"Path to a compatibility registry JSON file; default the registry built into this binary"},
                 "section":{"type":"string","enum":crate::compat::SECTIONS},
                 "component":{"type":"string","description":"Exact component name, case insensitive"}
-            },"required":["registry"],"additionalProperties":false}
+            },"additionalProperties":false}
+        }),
+        json!({
+            "name": "hooks_doctor",
+            "description": "Read-only check of agent hook configs (Claude Code, Codex, Gemini, Cursor, Copilot, Antigravity) against agent-hooks compatibility records: unsupported events, turn-end hooks written for session exit, outputs a host ignores, npx packages, version drift and stale evidence. Never edits configs; command values are redacted.",
+            "inputSchema": {"type": "object", "properties": {
+                "host": {"type": "string", "enum": ["claude", "codex", "gemini", "cursor", "copilot", "antigravity"]},
+                "stale_days": {"type": "integer", "minimum": 0, "description": "Evidence older than this is stale (default 30)"},
+                "cwd": {"type": "string", "description": "Project directory for project-level configs; default the server cwd"},
+                "registry": {"type": "string", "description": "Registry JSON path; default the embedded snapshot"}
+            }, "additionalProperties": false}
         }),
         point("def", "Where is this symbol defined? Compiler-accurate across files, re-exports and overloads, where grep matches every same-named string. Prefer over grep for any code identifier. Pass `symbol` (a name, no position needed) or line/column. `ready: false` means unknown: fall back to grep."),
         point("refs", "Who uses or calls this symbol? Every reference across the workspace, each named by its containing function, declaration excluded. Prefer over grep for identifiers: it skips comments, strings and unrelated same-named symbols. Pass `symbol` (a name, no position needed) or line/column. `ready: false` means unknown, not none."),
@@ -392,6 +408,7 @@ mod tests {
                     || name == "route"
                     || name == "compat"
                     || name == "acp_doctor"
+                    || name == "hooks_doctor"
                     || Kind::parse(name).is_some(),
                 "tool {name} maps to no query kind"
             );

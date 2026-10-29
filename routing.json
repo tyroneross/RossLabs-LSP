@@ -130,9 +130,9 @@
       "topic": "Agent hooks (Claude Code, Codex hook events, payloads, timeouts)",
       "keywords": ["hooks", "hook", "pretooluse", "posttooluse", "sessionstart", "stop", "agent-hooks"],
       "use": "compat agent-hooks section + hooks doctor",
-      "mcp": "compat {registry, section: \"agent-hooks\"}; hooks_doctor",
-      "cli": "rosslabs-lsp compat compatibility/registry.json --section agent-hooks; rosslabs-lsp hooks doctor",
-      "notes": "Check before writing or changing hook configs on any host. The agent-hooks section and hooks doctor land with branch feat/agent-hooks-compat-1028; older builds reject them."
+      "mcp": "compat {section: \"agent-hooks\"}; hooks_doctor",
+      "cli": "rosslabs-lsp compat --section agent-hooks; rosslabs-lsp hooks doctor",
+      "notes": "Check before writing or changing hook configs on any host. Builds older than the agent-hooks merge reject this section; check `rosslabs-lsp doctor` for the build date."
     },
     {
       "id": "acp-agents",
@@ -150,8 +150,8 @@
       "topic": "Terminal input (keystrokes, paste, PTY behaviour)",
       "keywords": ["terminal", "terminal-input", "pty", "tty", "keystroke", "paste", "input"],
       "use": "compat terminal-input section",
-      "mcp": "compat {registry, section: \"terminal-input\"}",
-      "cli": "rosslabs-lsp compat compatibility/registry.json --section terminal-input",
+      "mcp": "compat {section: \"terminal-input\"}",
+      "cli": "rosslabs-lsp compat --section terminal-input",
       "notes": "Recorded evidence only; an empty section means unknown."
     },
     {
@@ -160,8 +160,8 @@
       "topic": "Protocols (MCP, LSP, ACP wire boundaries)",
       "keywords": ["protocols", "protocol", "mcp", "lsp", "json-rpc", "stdio"],
       "use": "compat protocols section",
-      "mcp": "compat {registry, section: \"protocols\"}",
-      "cli": "rosslabs-lsp compat compatibility/registry.json --section protocols",
+      "mcp": "compat {section: \"protocols\"}",
+      "cli": "rosslabs-lsp compat --section protocols",
       "notes": "Recorded evidence only; an empty section means unknown."
     },
     {
@@ -170,8 +170,8 @@
       "topic": "Environments (OS, shell, sandbox)",
       "keywords": ["environments", "environment", "os", "sandbox", "shell", "macos", "linux"],
       "use": "compat environments section",
-      "mcp": "compat {registry, section: \"environments\"}",
-      "cli": "rosslabs-lsp compat compatibility/registry.json --section environments",
+      "mcp": "compat {section: \"environments\"}",
+      "cli": "rosslabs-lsp compat --section environments",
       "notes": "Recorded evidence only; an empty section means unknown."
     },
     {
@@ -180,8 +180,8 @@
       "topic": "Build dependencies (toolchains, package versions)",
       "keywords": ["build", "build-dependencies", "dependencies", "toolchain", "version", "package"],
       "use": "compat build-dependencies section",
-      "mcp": "compat {registry, section: \"build-dependencies\"}",
-      "cli": "rosslabs-lsp compat compatibility/registry.json --section build-dependencies",
+      "mcp": "compat {section: \"build-dependencies\"}",
+      "cli": "rosslabs-lsp compat --section build-dependencies",
       "notes": "Recorded evidence only; an empty section means unknown."
     },
     {
@@ -190,8 +190,8 @@
       "topic": "UI contracts (JS-to-CSS classes, icons, text, accessibility)",
       "keywords": ["ui", "ui-contracts", "css", "icons", "accessibility", "a11y"],
       "use": "ui query + compat ui-contracts section",
-      "mcp": "ui {file}; compat {registry, section: \"ui-contracts\"}",
-      "cli": "rosslabs-lsp ui <file>; rosslabs-lsp compat compatibility/registry.json --section ui-contracts",
+      "mcp": "ui {file}; compat {section: \"ui-contracts\"}",
+      "cli": "rosslabs-lsp ui <file>; rosslabs-lsp compat --section ui-contracts",
       "notes": "ui is a static scan and needs no language server."
     },
     {
@@ -200,8 +200,8 @@
       "topic": "Security and trust boundaries",
       "keywords": ["security", "security-trust", "trust", "permissions", "auth"],
       "use": "compat security-trust section",
-      "mcp": "compat {registry, section: \"security-trust\"}",
-      "cli": "rosslabs-lsp compat compatibility/registry.json --section security-trust",
+      "mcp": "compat {section: \"security-trust\"}",
+      "cli": "rosslabs-lsp compat --section security-trust",
       "notes": "Recorded evidence only; an empty section means unknown."
     },
     {
@@ -210,8 +210,8 @@
       "topic": "Language tooling compatibility (server versions vs hosts)",
       "keywords": ["language-tooling", "tooling", "server", "servers", "coverage"],
       "use": "doctor + compat language-tooling section",
-      "mcp": "doctor; compat {registry, section: \"language-tooling\"}",
-      "cli": "rosslabs-lsp doctor; rosslabs-lsp compat compatibility/registry.json --section language-tooling",
+      "mcp": "doctor; compat {section: \"language-tooling\"}",
+      "cli": "rosslabs-lsp doctor; rosslabs-lsp compat --section language-tooling",
       "notes": "doctor also prints the build commit and date, so a stale install is visible."
     },
     {
