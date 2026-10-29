@@ -26,3 +26,6 @@
 .navgator/architecture/freshness.json.tmp*
 # <<< NavGator safety guard
 .serena/
+
+# compat record writer lock
+compatibility/*.lock
