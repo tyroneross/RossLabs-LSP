@@ -242,12 +242,13 @@ fn tool_list() -> Vec<Value> {
         }),
         json!({
             "name": "hooks_doctor",
-            "description": "Read-only check of agent hook configs (Claude Code, Codex, Gemini, Cursor, Copilot, Antigravity) against agent-hooks compatibility records: unsupported events, turn-end hooks written for session exit, outputs a host ignores, npx packages, version drift and stale evidence. Never edits configs; command values are redacted.",
+            "description": "Read-only check of agent hook configs (Claude Code, Codex, Gemini, Cursor, Copilot, Antigravity) against agent-hooks compatibility records: unsupported events, turn-end hooks written for session exit, outputs a host ignores, npx packages, version drift and stale evidence. `drift: true` lists, per detected host, the records to re-verify. Never edits configs; command values are redacted.",
             "inputSchema": {"type": "object", "properties": {
                 "host": {"type": "string", "enum": ["claude", "codex", "gemini", "cursor", "copilot", "antigravity"]},
                 "stale_days": {"type": "integer", "minimum": 0, "description": "Evidence older than this is stale (default 30)"},
                 "cwd": {"type": "string", "description": "Project directory for project-level configs; default the server cwd"},
-                "registry": {"type": "string", "description": "Registry JSON path; default the embedded snapshot"}
+                "registry": {"type": "string", "description": "Registry JSON path; default the embedded snapshot"},
+                "drift": {"type": "boolean", "description": "Report only installed host versions vs versions the records observed, with record ids to re-verify (default false)"}
             }, "additionalProperties": false}
         }),
         point("def", "Where is this symbol defined? Compiler-accurate across files, re-exports and overloads, where grep matches every same-named string. Prefer over grep for any code identifier. Pass `symbol` (a name, no position needed) or line/column. `ready: false` means unknown: fall back to grep."),

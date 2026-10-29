@@ -183,3 +183,10 @@ events a host does not support, turn-end hooks written for session exit, outputs
 a host ignores, unpinned `npx` packages, and host versions outside the recorded
 evidence. It is read-only and redacts command values. See
 [compatibility/README.md](compatibility/README.md#agent-hooks).
+
+`hooks doctor --drift` (MCP: `hooks_doctor {drift: true}`; default off) skips
+config parsing and lists, for each detected host, the installed version, the host
+versions the records observed, and the record ids to re-verify. `rosslabs-lsp compat
+refresh <registry.json> --section agent-hooks --host ID [--dry-run]` re-reads
+local evidence only (`--version` and transcript fields) and appends revision
+records for drifted `verified` records; documentation records are never rewritten.

@@ -4,7 +4,12 @@
 //! Evidence registry for component boundaries. Never executes remediation text.
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
-use std::{collections::HashSet, fs, io::Read, path::Path};
+use std::{
+    collections::{HashMap, HashSet},
+    fs,
+    io::Read,
+    path::Path,
+};
 
 pub const SECTIONS: &[&str] = &[
     "language-tooling",
@@ -91,6 +96,9 @@ pub fn validate(doc: &Value) -> Result<(), String> {
                 ));
             }
         }
+        if !r["supersedes"].is_null() {
+            required(r, "supersedes").map_err(|e| format!("{id}: {e}"))?;
+        }
         let evidence = r["evidence"]
             .as_array()
             .ok_or("evidence must be an array")?;
@@ -124,6 +132,21 @@ pub fn civil_days(date: &str) -> Option<i64> {
     Some(era * 146_097 + doe - 719_468)
 }
 
+/// `YYYY-MM-DD` for days since 1970-01-01 (inverse of `civil_days`).
+pub fn civil_date(days: i64) -> String {
+    // Howard Hinnant's civil_from_days.
+    let z = days + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = yoe + era * 400 + i64::from(m <= 2);
+    format!("{y:04}-{m:02}-{d:02}")
+}
+
 /// Today in days since the epoch (UTC).
 pub fn today_days() -> i64 {
     std::time::SystemTime::now()
@@ -144,14 +167,39 @@ pub fn newest_observed(record: &Value) -> Option<(i64, String)> {
         .max_by_key(|(d, _)| *d)
 }
 
+/// Old record id -> the revision record that names it in `supersedes`.
+/// Evidence is append-only, so a refresh adds a revision instead of editing.
+pub fn supersession(records: &[Value]) -> HashMap<String, String> {
+    records
+        .iter()
+        .filter_map(|r| {
+            Some((
+                r["supersedes"].as_str()?.to_string(),
+                r["id"].as_str()?.to_string(),
+            ))
+        })
+        .collect()
+}
+
+/// Records no later revision supersedes: the evidence that applies now.
+pub fn current_records(records: &[Value]) -> Vec<Value> {
+    let old = supersession(records);
+    records
+        .iter()
+        .filter(|r| r["id"].as_str().is_none_or(|id| !old.contains_key(id)))
+        .cloned()
+        .collect()
+}
+
 /// Mark each record stale when its newest evidence is older than `days`.
 /// A record with no parseable evidence date is stale: its age is unknown.
+/// A record marked `superseded_by` is history, never stale.
 pub fn annotate_stale(records: &mut [Value], days: u64, today: i64) -> usize {
     let mut stale = 0;
     for r in records.iter_mut() {
         let newest = newest_observed(r);
         let age = newest.as_ref().map(|(d, _)| today - d);
-        let is_stale = age.is_none_or(|a| a > days as i64);
+        let is_stale = r["superseded_by"].is_null() && age.is_none_or(|a| a > days as i64);
         stale += usize::from(is_stale);
         r["freshness"] = json!({
             "newest_observed_at": newest.map(|(_, s)| s),
@@ -226,6 +274,7 @@ fn query_bytes(
     let doc: Value =
         serde_json::from_slice(bytes).map_err(|e| format!("invalid registry JSON: {e}"))?;
     validate(&doc)?;
+    let newer = supersession(doc["records"].as_array().unwrap());
     let mut records: Vec<_> = doc["records"]
         .as_array()
         .unwrap()
@@ -242,6 +291,11 @@ fn query_bytes(
         })
         .cloned()
         .collect();
+    for r in records.iter_mut() {
+        if let Some(by) = r["id"].as_str().and_then(|id| newer.get(id)) {
+            r["superseded_by"] = json!(by);
+        }
+    }
     let stale = stale_days.map(|days| annotate_stale(&mut records, days, today_days()));
     let mut out = json!({"schema_version": 1, "registry": path, "registry_sha256": digest, "validated": true,
         "coverage": if records.is_empty() { "unknown" } else { "recorded" },
@@ -255,9 +309,6 @@ fn query_bytes(
 
 /// Append an immutable evidence record. All cooperating writers share a lock.
 pub fn record(path: &str, input: &str) -> Result<Value, String> {
-    use std::io::Write;
-    use std::os::fd::AsRawFd;
-    use std::os::unix::fs::OpenOptionsExt;
     if !fs::metadata(input).map_err(|e| e.to_string())?.is_file() {
         return Err("record must be a regular file".into());
     }
@@ -274,6 +325,15 @@ pub fn record(path: &str, input: &str) -> Result<Value, String> {
         return Err("record exceeds 1 MiB limit".into());
     }
     let item: Value = serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
+    record_value(path, &item)
+}
+
+/// Append one validated record under the shared lock. An existing id must be
+/// byte-identical (idempotent); a changed record needs a new revision id.
+pub fn record_value(path: &str, item: &Value) -> Result<Value, String> {
+    use std::io::Write;
+    use std::os::fd::AsRawFd;
+    use std::os::unix::fs::OpenOptionsExt;
     validate(&json!({"schema_version":1,"records":[item.clone()]}))?;
     let target = Path::new(path);
     let parent = target
@@ -322,9 +382,20 @@ pub fn record(path: &str, input: &str) -> Result<Value, String> {
         Err(e) => return Err(e.to_string()),
     };
     validate(&doc)?;
+    if let Some(prior) = item["supersedes"].as_str() {
+        let records = doc["records"].as_array().unwrap();
+        if !records.iter().any(|r| r["id"] == prior) {
+            return Err(format!("supersedes names no record: {prior}"));
+        }
+        if let Some(by) = supersession(records).get(prior) {
+            if item["id"] != by.as_str() {
+                return Err(format!("{prior} is already superseded by {by}"));
+            }
+        }
+    }
     let records = doc["records"].as_array_mut().unwrap();
     if let Some(old) = records.iter().find(|r| r["id"] == item["id"]) {
-        if old != &item {
+        if old != item {
             return Err(
                 "record id already exists with different evidence; use a new revision id".into(),
             );
@@ -370,6 +441,9 @@ pub fn cli(args: &[String]) -> Result<Value, String> {
             return Err("usage: compat record <registry.json> <record.json>".into());
         }
         return record(&args[1], &args[2]);
+    }
+    if args.first().is_some_and(|s| s == "refresh") {
+        return crate::hooks::refresh_cli(&args[1..]);
     }
     if args == ["sections"] {
         return Ok(sections());
@@ -469,6 +543,42 @@ mod tests {
         assert!(err.contains("reinstall"), "{err}");
         let q = query(None, Some("future-section"), None).unwrap_err();
         assert!(q.contains("built ") && q.contains("reinstall"), "{q}");
+    }
+
+    #[test]
+    fn revisions_supersede_without_editing_and_cannot_fork() {
+        let dir = std::env::temp_dir().join(format!("compat-supersede-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let registry = dir.join("registry.json");
+        let reg = registry.to_str().unwrap();
+        record_value(reg, &record()).unwrap();
+        let mut rev = record();
+        rev["id"] = json!("test@2");
+        rev["supersedes"] = json!("test");
+        assert_eq!(record_value(reg, &rev).unwrap()["status"], "recorded");
+        let mut fork = rev.clone();
+        fork["id"] = json!("test@3");
+        assert!(record_value(reg, &fork)
+            .unwrap_err()
+            .contains("already superseded"));
+        fork["supersedes"] = json!("missing");
+        assert!(record_value(reg, &fork)
+            .unwrap_err()
+            .contains("names no record"));
+        fork["supersedes"] = json!(42);
+        assert!(record_value(reg, &fork).is_err());
+        let out = query_with(Some(reg), None, None, Some(0)).unwrap();
+        let recs = out["records"].as_array().unwrap();
+        assert_eq!(recs[0]["superseded_by"], "test@2");
+        assert_eq!(recs[0]["freshness"]["stale"], false);
+        let doc: Value = serde_json::from_slice(&fs::read(&registry).unwrap()).unwrap();
+        let current = current_records(doc["records"].as_array().unwrap());
+        assert_eq!(current.len(), 1);
+        assert_eq!(current[0]["id"], "test@2");
+        assert_eq!(civil_date(civil_days("2026-10-28").unwrap()), "2026-10-28");
+        assert_eq!(civil_date(0), "1970-01-01");
+        assert_eq!(civil_date(civil_days("2024-02-29").unwrap()), "2024-02-29");
+        fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]

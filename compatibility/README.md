@@ -122,7 +122,8 @@ build/server disagreement. These are candidate test categories, not confirmed
 bugs in RossLabs LSP. Breaking field changes require a schema revision. A new
 section is additive and keeps schema version 1, but binaries built before it
 reject records in that section as an unknown section (`agent-hooks` was added
-this way on 2026-10-28). New records can use existing sections without new
+this way on 2026-10-28). The error names the binary's build commit and date and
+says to reinstall. New records can use existing sections without new
 runtime code.
 
 Primary protocol references for future adapters:
@@ -224,3 +225,30 @@ and long opaque tokens become `<redacted>`; the home directory prints as `~`.
 Exit status is 0 whenever the check ran. Limits: Claude Code plugin hooks,
 managed policy files, inline `[hooks]` tables in Codex `config.toml` (reported,
 not parsed), and plugin-based hosts (OpenCode, Amp, Cline) are not scanned.
+
+### Drift and refresh
+
+```sh
+rosslabs-lsp hooks doctor --drift [--json]      # installed vs recorded versions
+rosslabs-lsp compat refresh compatibility/registry.json --section agent-hooks --host claude --dry-run
+rosslabs-lsp compat refresh compatibility/registry.json --section agent-hooks --host claude
+```
+
+`hooks doctor --drift` (MCP `hooks_doctor {drift: true}`, default off) lists each
+detected host's installed version, the host versions its records observed, a
+status (`current`, `drift`, `unscoped`, `version-unknown`) and the record ids to
+re-verify. It skips config parsing.
+
+`compat refresh` re-reads local evidence only: the host's `--version` and field
+presence in the newest local transcript written by that version (Claude Code:
+`~/.claude/projects/*/*.jsonl`; Codex: `~/.codex/sessions/YYYY/MM/DD/*.jsonl`;
+up to the 50 newest files, first 8 MiB of each). For each `verified` record whose
+host version drifted and whose capability the transcript re-confirms, it appends a
+revision record through `compat record`: id `<id>@<version>`, `supersedes: <id>`,
+the earlier evidence kept and the new observation appended. Earlier records are
+never edited. Queries mark them `superseded_by`; the doctor and drift report use
+only current records. A transcript that disagrees with the record is reported as
+`contradicted` and nothing is written. `reported` (documentation) records are
+never rewritten; stale ones are flagged `flag-stale` for a manual docs re-read.
+Writes need an explicit registry path; without one, only `--dry-run` runs against
+the embedded registry. No network.

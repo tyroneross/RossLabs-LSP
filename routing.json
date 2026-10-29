@@ -131,8 +131,8 @@
       "keywords": ["hooks", "hook", "pretooluse", "posttooluse", "sessionstart", "stop", "agent-hooks"],
       "use": "compat agent-hooks section + hooks doctor",
       "mcp": "compat {section: \"agent-hooks\"}; hooks_doctor",
-      "cli": "rosslabs-lsp compat --section agent-hooks; rosslabs-lsp hooks doctor",
-      "notes": "Check before writing or changing hook configs on any host. Builds older than the agent-hooks merge reject this section; check `rosslabs-lsp doctor` for the build date."
+      "cli": "rosslabs-lsp compat --section agent-hooks; rosslabs-lsp hooks doctor [--drift]; rosslabs-lsp compat refresh <registry.json> --section agent-hooks --host ID [--dry-run]",
+      "notes": "Check before writing or changing hook configs on any host. `hooks doctor --drift` (MCP `drift: true`, default off) lists records to re-verify when an installed host version differs from the recorded one; `compat refresh` re-confirms them from local transcripts (no network). Builds older than the agent-hooks merge reject this section, and the error names the build date; reinstall to fix."
     },
     {
       "id": "acp-agents",

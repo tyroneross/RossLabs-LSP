@@ -30,8 +30,9 @@ USAGE
   rosslabs-lsp acp doctor [--agent ID]... [--cwd DIR] [--timeout SECS] [--json] [--first-token] [--registry PATH|URL]
   rosslabs-lsp compat record <registry.json> <record.json>
   rosslabs-lsp compat sections
+  rosslabs-lsp compat refresh [<registry.json>] --section agent-hooks --host ID [--dry-run]
   rosslabs-lsp compat [<registry.json>] [--section NAME] [--component NAME] [--stale-days N]
-  rosslabs-lsp hooks doctor [--host ID] [--json] [--stale-days N] [--cwd DIR] [--registry PATH]
+  rosslabs-lsp hooks doctor [--host ID] [--json] [--drift] [--stale-days N] [--cwd DIR] [--registry PATH]
 
 OPTIONS
   --raw     emit untouched LSP payloads instead of compact locations
@@ -68,6 +69,8 @@ HOOKS
   hooks doctor read agent hook configs (claude, codex, gemini, cursor, copilot,
                antigravity) and check events, outputs and versions against the
                agent-hooks compatibility records. Read-only; secrets redacted.
+               --drift lists installed vs recorded host versions and the
+               records to re-verify.
 
 MODES
   mcp       serve the same queries over MCP stdio (for Claude Code, Codex, ...)
