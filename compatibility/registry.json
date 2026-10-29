@@ -2442,6 +2442,102 @@
         "snapshot": "documentation fetched 2026-10-28",
         "workspace": "not-applicable"
       }
+    },
+    {
+      "capability": "transcript-token-usage",
+      "cause": "Transcript formats and usage fields differ by host.",
+      "components": [
+        {
+          "name": "Claude Code",
+          "version": "2.1.312"
+        },
+        {
+          "name": "hook script",
+          "version": "unknown"
+        }
+      ],
+      "evidence": [
+        {
+          "observed_at": "2026-10-28",
+          "result": "Assistant message records carry message.usage with input_tokens, output_tokens, cache_read_input_tokens and cache_creation_input_tokens.",
+          "scope": "One Claude Code 2.1.306 session transcript on one Mac",
+          "source": "local transcript under the Claude projects directory"
+        },
+        {
+          "observed_at": "2026-10-29",
+          "result": "Assistant message records carry message.usage with input_tokens, output_tokens, cache_read_input_tokens and cache_creation_input_tokens.",
+          "scope": "First 8 MiB of one Claude Code 2.1.312 session transcript on one Mac; `claude --version` reported 2.1.312; recorded by `compat refresh`",
+          "source": "local transcript under the Claude projects directory"
+        }
+      ],
+      "id": "agent-hooks.claude.transcript-token-usage@2.1.312",
+      "owner": "hook script author; host adapter",
+      "remediation": "Check this record's result before relying on the capability; degrade to another event when support is no.",
+      "section": "agent-hooks",
+      "status": "verified",
+      "supersedes": "agent-hooks.claude.transcript-token-usage",
+      "symptom": "A hook cannot measure context usage from the transcript.",
+      "validity": {
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:yes"
+        ],
+        "environment": "macOS; host defaults",
+        "limitations": [
+          "Read-only inspection of local files on one Mac; not a documented contract.",
+          "Applies to the named host version only."
+        ],
+        "snapshot": "local files read 2026-10-29",
+        "workspace": "not-applicable"
+      }
+    },
+    {
+      "capability": "transcript-context-window",
+      "cause": "Few transcripts record the context window size.",
+      "components": [
+        {
+          "name": "Claude Code",
+          "version": "2.1.312"
+        },
+        {
+          "name": "hook script",
+          "version": "unknown"
+        }
+      ],
+      "evidence": [
+        {
+          "observed_at": "2026-10-28",
+          "result": "No context_window or max_input_tokens field appears in the transcript; window must come from a table, catalog or override.",
+          "scope": "One Claude Code 2.1.306 session transcript on one Mac",
+          "source": "local transcript under the Claude projects directory"
+        },
+        {
+          "observed_at": "2026-10-29",
+          "result": "No context_window or max_input_tokens field appears in the transcript; window must come from a table, catalog or override.",
+          "scope": "First 8 MiB of one Claude Code 2.1.312 session transcript on one Mac; `claude --version` reported 2.1.312; recorded by `compat refresh`",
+          "source": "local transcript under the Claude projects directory"
+        }
+      ],
+      "id": "agent-hooks.claude.transcript-context-window@2.1.312",
+      "owner": "hook script author; host adapter",
+      "remediation": "Check this record's result before relying on the capability; degrade to another event when support is no.",
+      "section": "agent-hooks",
+      "status": "verified",
+      "supersedes": "agent-hooks.claude.transcript-context-window",
+      "symptom": "A hook cannot read the model context window and must use another source.",
+      "validity": {
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:no"
+        ],
+        "environment": "macOS; host defaults",
+        "limitations": [
+          "Read-only inspection of local files on one Mac; not a documented contract.",
+          "Applies to the named host version only."
+        ],
+        "snapshot": "local files read 2026-10-29",
+        "workspace": "not-applicable"
+      }
     }
   ],
   "schema_version": 1

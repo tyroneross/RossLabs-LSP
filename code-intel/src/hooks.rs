@@ -1753,6 +1753,7 @@ mod tests {
         fake_bin(&fx.root.join("bin"), "claude", "2.1.312 (Claude Code)");
         let mut o = opts(Some("claude"));
         o.drift = true;
+        o.registry = Some(base_registry(&fx.root));
         let report = doctor(&env, &o).unwrap();
         assert_eq!(report["mode"], "drift");
         let h = &report["hosts"][0];
@@ -1775,7 +1776,8 @@ mod tests {
         assert!(render_drift(&report).contains("re-verify agent-hooks.claude"));
 
         // A revision record that supersedes every drifted record clears drift.
-        let mut doc: Value = serde_json::from_str(EMBEDDED_REGISTRY).unwrap();
+        let mut doc: Value =
+            serde_json::from_slice(&fs::read(o.registry.as_ref().unwrap()).unwrap()).unwrap();
         let recs = doc["records"].as_array_mut().unwrap();
         let mut revisions = Vec::new();
         for r in recs
@@ -1804,6 +1806,21 @@ mod tests {
         .is_err());
     }
 
+    /// The embedded registry without refresh revisions, so tests start from
+    /// the 2.1.306 observations whatever later refreshes appended.
+    fn base_registry(dir: &Path) -> String {
+        let mut doc: Value = serde_json::from_str(EMBEDDED_REGISTRY).unwrap();
+        doc["records"]
+            .as_array_mut()
+            .unwrap()
+            .retain(|r| r["supersedes"].is_null());
+        let path = dir.join("base-registry.json");
+        let mut bytes = serde_json::to_vec_pretty(&doc).unwrap();
+        bytes.push(b'\n');
+        fs::write(&path, bytes).unwrap();
+        path.to_string_lossy().into_owned()
+    }
+
     fn claude_transcript(env: &Env, name: &str, version: &str, usage: bool) {
         let u = if usage {
             r#"{"input_tokens":1,"output_tokens":2,"cache_read_input_tokens":3,"cache_creation_input_tokens":4}"#
@@ -1822,15 +1839,16 @@ mod tests {
     fn refresh_appends_revisions_for_verified_records_only() {
         let (fx, env) = fixture("refresh");
         fake_bin(&fx.root.join("bin"), "claude", "2.1.312 (Claude Code)");
-        let reg = fx.root.join("registry.json");
-        fs::write(&reg, EMBEDDED_REGISTRY).unwrap();
+        let base = base_registry(&fx.root);
+        let original = fs::read_to_string(&base).unwrap();
+        let reg = PathBuf::from(&base);
         let path = reg.to_str().unwrap();
         // A transcript from another version is not evidence.
         claude_transcript(&env, "old.jsonl", "2.1.306", true);
         let out = refresh(&env, Some(path), "claude", false).unwrap();
         assert_eq!(out["refreshed"], 0, "{out}");
         assert!(out["probe"]["error"].as_str().unwrap().contains("2.1.312"));
-        assert_eq!(fs::read_to_string(&reg).unwrap(), EMBEDDED_REGISTRY);
+        assert_eq!(fs::read_to_string(&reg).unwrap(), original);
 
         claude_transcript(&env, "new.jsonl", "2.1.312", true);
         let before = fs::read_to_string(&reg).unwrap();
@@ -1845,7 +1863,7 @@ mod tests {
         let out = refresh(&env, Some(path), "claude", false).unwrap();
         assert_eq!(out["refreshed"], 2, "{out}");
         let doc: Value = serde_json::from_str(&fs::read_to_string(&reg).unwrap()).unwrap();
-        let old: Value = serde_json::from_str(EMBEDDED_REGISTRY).unwrap();
+        let old: Value = serde_json::from_str(&original).unwrap();
         let recs = doc["records"].as_array().unwrap();
         // Append-only: every original record is byte-identical and still present.
         assert_eq!(
@@ -1896,7 +1914,8 @@ mod tests {
         let (fx, env) = fixture("refresh-contra");
         fake_bin(&fx.root.join("bin"), "claude", "2.1.312 (Claude Code)");
         claude_transcript(&env, "new.jsonl", "2.1.312", false);
-        let out = refresh(&env, None, "claude", true).unwrap();
+        let base = base_registry(&fx.root);
+        let out = refresh(&env, Some(&base), "claude", true).unwrap();
         let usage = out["actions"]
             .as_array()
             .unwrap()
