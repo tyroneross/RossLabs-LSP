@@ -17,6 +17,17 @@ pub const SECTIONS: &[&str] = &[
     "agent-hooks",
 ];
 
+/// Error for a section this build does not know. A registry newer than the
+/// binary is the usual cause, so name the build and say how to fix it.
+pub fn unknown_section(section: &str) -> String {
+    format!(
+        "unknown section '{section}': this rosslabs-lsp build (commit {}, built {}) knows {}. If the registry is newer than the binary, reinstall rosslabs-lsp (`rosslabs-lsp doctor` prints the build).",
+        env!("ROSSLABS_LSP_BUILD_COMMIT"),
+        env!("ROSSLABS_LSP_BUILD_DATE"),
+        SECTIONS.join(", ")
+    )
+}
+
 pub fn sections() -> Value {
     json!({"schema_version": 1, "sections": SECTIONS})
 }
@@ -41,8 +52,9 @@ pub fn validate(doc: &Value) -> Result<(), String> {
         if !ids.insert(id) {
             return Err(format!("duplicate record id: {id}"));
         }
-        if !SECTIONS.contains(&required(r, "section")?) {
-            return Err(format!("{id}: unknown section"));
+        let section = required(r, "section")?;
+        if !SECTIONS.contains(&section) {
+            return Err(format!("{id}: {}", unknown_section(section)));
         }
         for key in ["capability", "symptom", "cause", "remediation", "owner"] {
             required(r, key)?;
@@ -170,7 +182,7 @@ pub fn query_with(
 ) -> Result<Value, String> {
     if let Some(s) = section {
         if !SECTIONS.contains(&s) {
-            return Err(format!("unknown section: {s}"));
+            return Err(unknown_section(s));
         }
     }
     let (bytes, path) = match path {
@@ -443,6 +455,22 @@ mod tests {
         doc["records"] = json!([record(), record()]);
         assert!(validate(&doc).unwrap_err().contains("duplicate"));
     }
+    #[test]
+    fn unknown_section_names_the_build_and_says_to_reinstall() {
+        let mut doc = json!({"schema_version":1,"records":[record()]});
+        doc["records"][0]["section"] = json!("future-section");
+        let err = validate(&doc).unwrap_err();
+        assert!(
+            err.starts_with("test: unknown section 'future-section'"),
+            "{err}"
+        );
+        assert!(err.contains(env!("ROSSLABS_LSP_BUILD_COMMIT")), "{err}");
+        assert!(err.contains(env!("ROSSLABS_LSP_BUILD_DATE")), "{err}");
+        assert!(err.contains("reinstall"), "{err}");
+        let q = query(None, Some("future-section"), None).unwrap_err();
+        assert!(q.contains("built ") && q.contains("reinstall"), "{q}");
+    }
+
     #[test]
     fn rejects_wrong_shape_and_unsupported_schema() {
         for doc in [
