@@ -150,7 +150,11 @@ an atomic replacement. Repeating identical evidence is a no-op. An existing ID
 with different evidence is rejected: use a new revision ID and retain the earlier
 record for provenance. Both input and final registry have a 1 MiB limit. The
 parent directory must already exist. Keep the `.lock` file in place; deleting it
-while a writer runs defeats coordination. Writes create private (0600) files.
+while a writer runs defeats coordination. A rewrite keeps the existing registry's
+permissions; a new registry is created 0644 (the lock file is 0600). Every write
+re-validates `supersedes` links across the whole file: the target must exist, be
+another record in the same section, have no other successor, and the chain must
+not loop.
 
 This stores evidence only. It does not execute repairs or upgrade `reported`
 claims to runtime verification. MCP remains read-only. Keep transcript-derived

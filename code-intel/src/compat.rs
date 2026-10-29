@@ -45,6 +45,53 @@ fn required<'a>(v: &'a Value, key: &str) -> Result<&'a str, String> {
 }
 
 pub fn validate(doc: &Value) -> Result<(), String> {
+    validate_shapes(doc)?;
+    validate_supersedes(doc["records"].as_array().unwrap())
+}
+
+/// Revision links must form simple chains inside one section: the target
+/// exists, is not the record itself, shares its section, has at most one
+/// successor (no fork), and following the links never loops.
+fn validate_supersedes(records: &[Value]) -> Result<(), String> {
+    let by_id: HashMap<&str, &Value> = records
+        .iter()
+        .filter_map(|r| Some((r["id"].as_str()?, r)))
+        .collect();
+    let mut claimed: HashMap<&str, &str> = HashMap::new();
+    for r in records {
+        let (Some(id), Some(prior)) = (r["id"].as_str(), r["supersedes"].as_str()) else {
+            continue;
+        };
+        if prior == id {
+            return Err(format!("{id}: supersedes itself"));
+        }
+        let target = by_id
+            .get(prior)
+            .ok_or_else(|| format!("{id}: supersedes names no record: {prior}"))?;
+        if target["section"] != r["section"] {
+            return Err(format!("{id}: supersedes {prior} in another section"));
+        }
+        if let Some(other) = claimed.insert(prior, id) {
+            return Err(format!("{id}: {prior} is already superseded by {other}"));
+        }
+    }
+    for start in claimed.keys() {
+        let mut at = *start;
+        for _ in 0..=records.len() {
+            match by_id.get(at).and_then(|r| r["supersedes"].as_str()) {
+                Some(next) if next == *start => {
+                    return Err(format!("supersedes cycle through {start}"));
+                }
+                Some(next) => at = next,
+                None => break,
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Per-record structure only; `validate` adds the cross-record link checks.
+fn validate_shapes(doc: &Value) -> Result<(), String> {
     if doc["schema_version"].as_u64() != Some(1) {
         return Err("unsupported schema_version; expected 1".into());
     }
@@ -210,6 +257,9 @@ pub fn annotate_stale(records: &mut [Value], days: u64, today: i64) -> usize {
     stale
 }
 
+/// Permissions for a registry file `compat record` creates.
+const NEW_REGISTRY_MODE: u32 = 0o644;
+
 /// The registry compiled into this binary, used when no path is given.
 pub const EMBEDDED_REGISTRY: &str = include_str!("../../compatibility/registry.json");
 const EMBEDDED_LABEL: &str = "embedded compatibility/registry.json";
@@ -334,7 +384,7 @@ pub fn record_value(path: &str, item: &Value) -> Result<Value, String> {
     use std::io::Write;
     use std::os::fd::AsRawFd;
     use std::os::unix::fs::OpenOptionsExt;
-    validate(&json!({"schema_version":1,"records":[item.clone()]}))?;
+    validate_shapes(&json!({"schema_version":1,"records":[item.clone()]}))?;
     let target = Path::new(path);
     let parent = target
         .parent()
@@ -382,17 +432,6 @@ pub fn record_value(path: &str, item: &Value) -> Result<Value, String> {
         Err(e) => return Err(e.to_string()),
     };
     validate(&doc)?;
-    if let Some(prior) = item["supersedes"].as_str() {
-        let records = doc["records"].as_array().unwrap();
-        if !records.iter().any(|r| r["id"] == prior) {
-            return Err(format!("supersedes names no record: {prior}"));
-        }
-        if let Some(by) = supersession(records).get(prior) {
-            if item["id"] != by.as_str() {
-                return Err(format!("{prior} is already superseded by {by}"));
-            }
-        }
-    }
     let records = doc["records"].as_array_mut().unwrap();
     if let Some(old) = records.iter().find(|r| r["id"] == item["id"]) {
         if old != item {
@@ -405,6 +444,8 @@ pub fn record_value(path: &str, item: &Value) -> Result<Value, String> {
         );
     }
     records.push(item.clone());
+    // Links are checked against the whole file: missing target, fork, cycle.
+    validate(&doc)?;
     let mut output = serde_json::to_vec_pretty(&doc).map_err(|e| e.to_string())?;
     output.push(b'\n');
     if output.len() > 1024 * 1024 {
@@ -415,13 +456,24 @@ pub fn record_value(path: &str, item: &Value) -> Result<Value, String> {
         name.to_string_lossy(),
         std::process::id()
     ));
+    // Keep the existing registry's permissions; a new registry is 0644.
+    let mode = match fs::symlink_metadata(&target) {
+        Ok(m) => {
+            use std::os::unix::fs::PermissionsExt;
+            m.permissions().mode() & 0o7777
+        }
+        Err(_) => NEW_REGISTRY_MODE,
+    };
     let mut file = fs::OpenOptions::new()
         .write(true)
         .create_new(true)
-        .mode(0o600)
+        .mode(mode)
         .open(&temp)
         .map_err(|e| e.to_string())?;
     let result = (|| -> std::io::Result<()> {
+        use std::os::unix::fs::PermissionsExt;
+        // `mode()` is filtered by the umask; set it exactly.
+        file.set_permissions(fs::Permissions::from_mode(mode))?;
         file.write_all(&output)?;
         file.sync_all()?;
         fs::rename(&temp, &target)?;
@@ -578,6 +630,66 @@ mod tests {
         assert_eq!(civil_date(civil_days("2026-10-28").unwrap()), "2026-10-28");
         assert_eq!(civil_date(0), "1970-01-01");
         assert_eq!(civil_date(civil_days("2024-02-29").unwrap()), "2024-02-29");
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn validate_rejects_broken_supersedes_links_in_the_file() {
+        let rev = |id: &str, prior: &str| {
+            let mut r = record();
+            r["id"] = json!(id);
+            r["supersedes"] = json!(prior);
+            r
+        };
+        let check = |records: Vec<Value>| {
+            validate(&json!({"schema_version":1,"records":records})).map(|_| ())
+        };
+        assert!(check(vec![
+            record(),
+            rev("test@2", "test"),
+            rev("test@3", "test@2")
+        ])
+        .is_ok());
+        let missing = check(vec![record(), rev("test@2", "gone")]).unwrap_err();
+        assert!(missing.contains("names no record"), "{missing}");
+        let fork = check(vec![record(), rev("test@2", "test"), rev("test@3", "test")]).unwrap_err();
+        assert!(fork.contains("already superseded"), "{fork}");
+        let me = check(vec![rev("test", "test")]).unwrap_err();
+        assert!(me.contains("supersedes itself"), "{me}");
+        let mut other = rev("other@2", "test");
+        other["section"] = json!("protocols");
+        let cross = check(vec![record(), other]).unwrap_err();
+        assert!(cross.contains("another section"), "{cross}");
+        let cycle = check(vec![rev("a", "b"), rev("b", "c"), rev("c", "a")]).unwrap_err();
+        assert!(cycle.contains("cycle"), "{cycle}");
+        // A hand-edited fork in a registry file is rejected at read time too.
+        let dir = std::env::temp_dir().join(format!("compat-fork-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("registry.json");
+        let doc = json!({"schema_version":1,"records":[record(), rev("test@2","test"), rev("test@3","test")]});
+        fs::write(&path, serde_json::to_vec(&doc).unwrap()).unwrap();
+        assert!(query(Some(path.to_str().unwrap()), None, None)
+            .unwrap_err()
+            .contains("already superseded"));
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn record_keeps_registry_mode_and_creates_new_files_0644() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = std::env::temp_dir().join(format!("compat-mode-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("registry.json");
+        let reg = path.to_str().unwrap();
+        record_value(reg, &record()).unwrap();
+        let mode = |p: &Path| fs::metadata(p).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode(&path), 0o644);
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o640)).unwrap();
+        let mut rev = record();
+        rev["id"] = json!("test@2");
+        rev["supersedes"] = json!("test");
+        record_value(reg, &rev).unwrap();
+        assert_eq!(mode(&path), 0o640);
         fs::remove_dir_all(&dir).unwrap();
     }
 
