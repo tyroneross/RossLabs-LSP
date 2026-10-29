@@ -444,6 +444,51 @@ pub(crate) fn extract_version(text: &str) -> Option<String> {
         .map(str::to_string)
 }
 
+/// Longest version string accepted from a host's output.
+const MAX_VERSION_LEN: usize = 64;
+
+/// A host version safe to compare and to put in a record id: the first
+/// version-looking token, without a leading `v`, matching
+/// `\d+(\.\d+){1,3}([-+][A-Za-z0-9.]{1,32})?` and at most 64 bytes.
+/// Anything else is unknown (None).
+pub(crate) fn canonical_version(text: &str) -> Option<String> {
+    let v = extract_version(text)?;
+    let v = v.strip_prefix('v').unwrap_or(&v);
+    if v.len() > MAX_VERSION_LEN {
+        return None;
+    }
+    let (core, suffix) = match v.find(['-', '+']) {
+        Some(i) => (&v[..i], Some(&v[i + 1..])),
+        None => (v, None),
+    };
+    let parts: Vec<&str> = core.split('.').collect();
+    let core_ok = (2..=4).contains(&parts.len())
+        && parts
+            .iter()
+            .all(|p| !p.is_empty() && p.bytes().all(|b| b.is_ascii_digit()));
+    let suffix_ok = suffix.is_none_or(|x| {
+        (1..=32).contains(&x.len()) && x.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'.')
+    });
+    (core_ok && suffix_ok).then(|| v.to_string())
+}
+
+/// Whether two host versions name the same build, for drift checks. Both go
+/// through `canonical_version` (so `v2.1.312` equals `2.1.312`, and `2.1` equals
+/// `2.1.0`). A pre-release suffix (`-beta.1`) is significant: it is a different
+/// build. Build metadata (`+abc`) is ignored, as in SemVer.
+pub(crate) fn same_version(a: &str, b: &str) -> bool {
+    let (Some(a), Some(b)) = (canonical_version(a), canonical_version(b)) else {
+        return false;
+    };
+    let pre = |v: &str| -> String {
+        let v = v.split('+').next().unwrap_or(v);
+        v.split_once('-')
+            .map(|(_, p)| p.to_string())
+            .unwrap_or_default()
+    };
+    compare_versions(Some(&a), Some(&b)) == "current" && pre(&a) == pre(&b)
+}
+
 fn numeric_parts(v: &str) -> Option<Vec<u64>> {
     let v = v.strip_prefix('v').unwrap_or(v);
     let core: String = v
@@ -1387,6 +1432,28 @@ mod tests {
         assert_eq!(extract_version("goose 1.55.0\n").as_deref(), Some("1.55.0"));
         assert_eq!(extract_version("0.63.0").as_deref(), Some("0.63.0"));
         assert_eq!(extract_version("no version here"), None);
+        assert_eq!(canonical_version("v2.1.312").as_deref(), Some("2.1.312"));
+        assert_eq!(
+            canonical_version("2.1.312 (Claude Code)").as_deref(),
+            Some("2.1.312")
+        );
+        assert_eq!(
+            canonical_version("1.0.0-beta.1").as_deref(),
+            Some("1.0.0-beta.1")
+        );
+        assert_eq!(canonical_version("9.9.9/../../x"), None);
+        assert_eq!(canonical_version("1.2.3-$(rm)"), None);
+        assert_eq!(
+            canonical_version(&format!("1.2.3-{}", "a".repeat(40))),
+            None
+        );
+        assert_eq!(canonical_version("1.2.3.4.5"), None);
+        assert!(same_version("v2.1.312", "2.1.312"));
+        assert!(same_version("2.1", "2.1.0"));
+        assert!(same_version("1.0.0+build7", "1.0.0"));
+        assert!(!same_version("2.1.312-beta", "2.1.312"));
+        assert!(!same_version("2.1.312", "2.1.313"));
+        assert!(!same_version("unknown", "unknown"));
     }
 
     #[test]

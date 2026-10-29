@@ -351,12 +351,16 @@ fn detect(host: &Host, env: &Env) -> (Option<PathBuf>, bool, Option<String>) {
         .markers
         .iter()
         .any(|m| fs::symlink_metadata(env.home.join(m)).is_ok());
-    let version = binary.as_ref().and_then(|p| {
-        crate::acp::run_version(
-            &[p.to_string_lossy().into_owned(), "--version".into()],
-            VERSION_TIMEOUT,
-        )
-    });
+    // Only a well-formed version is kept; it may end up in a record id.
+    let version = binary
+        .as_ref()
+        .and_then(|p| {
+            crate::acp::run_version(
+                &[p.to_string_lossy().into_owned(), "--version".into()],
+                VERSION_TIMEOUT,
+            )
+        })
+        .and_then(|v| crate::acp::canonical_version(&v));
     (binary, marker, version)
 }
 
@@ -785,17 +789,19 @@ fn npx_finding(command: &str) -> Option<Value> {
     })
 }
 
-/// Normalised host version a record observed; None when unscoped (`unknown`).
+/// Canonical host version a record observed; None when unscoped (`unknown`)
+/// or not a well-formed version.
 fn observed_version(record: &Value, component: &str) -> Option<String> {
-    let rv = host_version(record, component).filter(|v| *v != "unknown")?;
-    Some(crate::acp::extract_version(rv).unwrap_or_else(|| rv.to_string()))
+    crate::acp::canonical_version(host_version(record, component)?)
 }
 
 /// Version-scoped records whose observed host version differs from `installed`.
 fn drifted_ids<'a>(component: &str, installed: &str, records: &[&'a Value]) -> Vec<&'a str> {
     records
         .iter()
-        .filter(|r| observed_version(r, component).is_some_and(|v| v != installed))
+        .filter(|r| {
+            observed_version(r, component).is_some_and(|v| !crate::acp::same_version(&v, installed))
+        })
         .filter_map(|r| r["id"].as_str())
         .collect()
 }
@@ -1101,7 +1107,7 @@ pub fn refresh(
             ));
             continue;
         };
-        if observed == installed {
+        if crate::acp::same_version(&observed, &installed) {
             actions.push(act(
                 "current",
                 format!("observed {observed} matches installed"),
@@ -1165,7 +1171,11 @@ pub fn refresh(
         });
         let revision = revise(r, host, &new_id, &installed, evidence);
         if !dry_run {
-            compat::record_value(registry.unwrap(), &revision)?;
+            // Report every failure; earlier appends stay valid on their own.
+            if let Err(e) = compat::record_value(registry.unwrap(), &revision) {
+                actions.push(json!({"id": id, "action": "error", "revision": new_id, "reason": e}));
+                continue;
+            }
         }
         ids.push(new_id.clone());
         let action = if dry_run {
@@ -1194,6 +1204,7 @@ pub fn refresh(
         },
         "actions": actions,
         "refreshed": refreshed,
+        "errors": actions.iter().filter(|a| a["action"] == "error").count(),
         "written": !dry_run && refreshed > 0,
         "network": false,
         "live_verified": false,
@@ -1339,12 +1350,18 @@ fn scan_transcript(host_id: &str, path: &Path, installed: &str) -> Option<Vec<Fa
             }
         }
         // A transcript from another version is not evidence for this one.
-        if version.as_deref().is_some_and(|v| v != installed) {
+        if version
+            .as_deref()
+            .is_some_and(|v| !crate::acp::same_version(v, installed))
+        {
             return None;
         }
         line.clear();
     }
-    if version.as_deref() != Some(installed) {
+    if !version
+        .as_deref()
+        .is_some_and(|v| crate::acp::same_version(v, installed))
+    {
         return None;
     }
     let yes_no = |b: bool| if b { "yes" } else { "no" };
@@ -1424,11 +1441,15 @@ fn with(mut f: Value, key: &str, value: &str) -> Value {
 
 fn which_in(path: Option<&OsString>, bin: &str) -> Option<PathBuf> {
     use std::os::unix::fs::PermissionsExt;
-    std::env::split_paths(path?).map(|d| d.join(bin)).find(|p| {
-        fs::metadata(p)
-            .map(|m| m.is_file() && m.permissions().mode() & 0o111 != 0)
-            .unwrap_or(false)
-    })
+    // Empty or relative PATH entries resolve against the cwd; never trust them.
+    std::env::split_paths(path?)
+        .filter(|d| d.is_absolute())
+        .map(|d| d.join(bin))
+        .find(|p| {
+            fs::metadata(p)
+                .map(|m| m.is_file() && m.permissions().mode() & 0o111 != 0)
+                .unwrap_or(false)
+        })
 }
 
 fn tilde(path: &Path, home: &Path) -> String {
@@ -1957,6 +1978,149 @@ mod tests {
             "--bogus"
         ]))
         .is_err());
+    }
+
+    fn drift_status(env: &Env, registry: &str, host: &str) -> Value {
+        let mut o = opts(Some(host));
+        o.drift = true;
+        o.registry = Some(registry.into());
+        doctor(env, &o).unwrap()["hosts"][0].clone()
+    }
+
+    #[test]
+    fn versions_are_normalised_once_and_hostile_output_is_unknown() {
+        let (fx, env) = fixture("versions");
+        let base = base_registry(&fx.root);
+        let bin = fx.root.join("bin");
+        fake_bin(&bin, "claude", "v2.1.306");
+        assert_eq!(drift_status(&env, &base, "claude")["status"], "current");
+        // A pre-release is a different build.
+        fake_bin(&bin, "claude", "2.1.306-beta.1 (Claude Code)");
+        let h = drift_status(&env, &base, "claude");
+        assert_eq!(
+            (h["status"].as_str(), h["installed"].as_str()),
+            (Some("drift"), Some("2.1.306-beta.1"))
+        );
+        // Hostile --version output never reaches a record id.
+        fake_bin(&bin, "claude", "9.9.9/../../etc");
+        let h = drift_status(&env, &base, "claude");
+        assert_eq!(h["status"], "version-unknown", "{h}");
+        assert!(refresh(&env, Some(&base), "claude", true).is_err());
+        // A v-prefixed install refreshes to a clean id.
+        fake_bin(&bin, "claude", "v2.1.312");
+        claude_transcript(&env, "new.jsonl", "2.1.312", true);
+        let out = refresh(&env, Some(&base), "claude", true).unwrap();
+        assert!(
+            out["actions"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|a| a["revision"] == "agent-hooks.claude.transcript-token-usage@2.1.312"),
+            "{out}"
+        );
+    }
+
+    #[test]
+    fn which_in_skips_empty_and_relative_path_entries() {
+        let (fx, _env) = fixture("which");
+        let bin = fx.root.join("bin");
+        assert!(which_in(Some(&OsString::from("")), "claude").is_none());
+        // A relative entry that does resolve (from the test cwd) to a real
+        // executable is still skipped.
+        let cwd = std::env::current_dir().unwrap();
+        let up = "../".repeat(cwd.components().count());
+        let rel = PathBuf::from(format!("{up}{}", bin.strip_prefix("/").unwrap().display()));
+        assert!(rel.is_relative() && rel.join("claude").is_file());
+        assert!(which_in(Some(&rel.clone().into_os_string()), "claude").is_none());
+        let joined = std::env::join_paths([PathBuf::from("rel"), bin.clone()]).unwrap();
+        assert_eq!(which_in(Some(&joined), "claude"), Some(bin.join("claude")));
+    }
+
+    #[test]
+    fn codex_probe_reads_rollouts_from_the_installed_version() {
+        let (fx, env) = fixture("codex-probe");
+        fake_bin(&fx.root.join("bin"), "codex", "codex-cli 0.170.0");
+        let base = base_registry(&fx.root);
+        let day = env.home.join(".codex/sessions/2026/10/28");
+        write(
+            &day.join("rollout-old.jsonl"),
+            "{\"type\":\"session_meta\",\"payload\":{\"cli_version\":\"0.165.0\"}}\n",
+        );
+        write(
+            &day.join("rollout-new.jsonl"),
+            concat!(
+                "{\"type\":\"session_meta\",\"payload\":{\"cli_version\":\"0.170.0\"}}\n",
+                "{\"type\":\"event_msg\",\"payload\":{\"type\":\"token_count\",\"info\":{\"last_token_usage\":{},\"total_token_usage\":{},\"model_context_window\":475000}}}\n"
+            ),
+        );
+        let out = refresh(&env, Some(&base), "codex", false).unwrap();
+        assert_eq!(out["refreshed"], 2, "{out}");
+        let doc: Value = serde_json::from_slice(&fs::read(&base).unwrap()).unwrap();
+        let cw = doc["records"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|r| r["id"] == "agent-hooks.codex.transcript-context-window@0.170.0")
+            .unwrap();
+        assert!(cw["evidence"][1]["result"]
+            .as_str()
+            .unwrap()
+            .contains("observed 475000"));
+        assert_eq!(drift_status(&env, &base, "codex")["status"], "current");
+    }
+
+    #[test]
+    fn refresh_reports_every_write_failure_and_keeps_earlier_appends() {
+        let (fx, env) = fixture("refresh-fail");
+        fake_bin(&fx.root.join("bin"), "claude", "2.1.312");
+        claude_transcript(&env, "new.jsonl", "2.1.312", true);
+        // Measure the two revisions, then pad the registry so only the first fits under 1 MiB.
+        let probe_reg = base_registry(&fx.root);
+        let base_len = fs::read(&probe_reg).unwrap().len();
+        refresh(&env, Some(&probe_reg), "claude", false).unwrap();
+        let doc: Value = serde_json::from_slice(&fs::read(&probe_reg).unwrap()).unwrap();
+        let full_len = fs::read(&probe_reg).unwrap().len();
+        let mut one = doc.clone();
+        one["records"].as_array_mut().unwrap().pop();
+        let one_len = serde_json::to_vec_pretty(&one).unwrap().len() + 1;
+        let (r1, r2) = (one_len - base_len, full_len - one_len);
+        let limit = 1024 * 1024;
+        let pad_len = limit - base_len - r1 - r2 / 2;
+        let base = base_registry(&fx.root);
+        let mut doc: Value = serde_json::from_slice(&fs::read(&base).unwrap()).unwrap();
+        let mut pad = doc["records"][0].clone();
+        pad["id"] = json!("padding");
+        pad["symptom"] = json!("");
+        let empty_len = {
+            doc["records"].as_array_mut().unwrap().push(pad.clone());
+            let n = serde_json::to_vec_pretty(&doc).unwrap().len() + 1;
+            doc["records"].as_array_mut().unwrap().pop();
+            n
+        };
+        pad["symptom"] = json!("x".repeat(pad_len - (empty_len - base_len)));
+        doc["records"].as_array_mut().unwrap().push(pad);
+        let mut bytes = serde_json::to_vec_pretty(&doc).unwrap();
+        bytes.push(b'\n');
+        fs::write(&base, bytes).unwrap();
+        let out = refresh(&env, Some(&base), "claude", false).unwrap();
+        assert_eq!(
+            (out["refreshed"].as_u64(), out["errors"].as_u64()),
+            (Some(1), Some(1)),
+            "{out}"
+        );
+        let err = out["actions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|a| a["action"] == "error")
+            .unwrap();
+        assert!(err["reason"].as_str().unwrap().contains("1 MiB"), "{err}");
+        let after: Value = serde_json::from_slice(&fs::read(&base).unwrap()).unwrap();
+        assert!(after["records"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|r| r["id"] == "agent-hooks.claude.transcript-token-usage@2.1.312"));
     }
 
     #[test]
