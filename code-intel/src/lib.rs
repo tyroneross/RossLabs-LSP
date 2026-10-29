@@ -10,6 +10,7 @@ mod lsp;
 mod mcp;
 mod query;
 mod registry;
+mod route;
 mod selector;
 mod ui;
 
@@ -19,7 +20,9 @@ const USAGE: &str = "\
 RossLabs LSP — compiler-grade code intelligence for any agent
 
 USAGE
-  rosslabs-lsp <query> <file>[:<line>:<column>]
+  rosslabs-lsp <query> <file>[:<line>:<column> | ::<symbol>]
+  rosslabs-lsp def|refs|hover --symbol <name> [--path <root-or-file>]
+  rosslabs-lsp route [<question-or-topic>] [--json | --markdown]
   rosslabs-lsp mcp
   rosslabs-lsp daemon
   rosslabs-lsp doctor
@@ -30,6 +33,13 @@ USAGE
 
 OPTIONS
   --raw     emit untouched LSP payloads instead of compact locations
+  --symbol  name a symbol instead of a position; with --path DIR (default .)
+            the defining file is found by name, with --path FILE it is exact
+
+ROUTING
+  route     which tool answers a question: by question, language, component
+            (hooks, ACP, terminal input, ...) or host. Offline keyword match
+            over the built-in routing index (routing.json / ROUTING.md).
 
 QUERIES
   def       definition of the symbol at a position
@@ -41,6 +51,8 @@ QUERIES
 
 EXAMPLES
   rosslabs-lsp def src/query.rs:42:11
+  rosslabs-lsp refs --symbol workspace_root
+  rosslabs-lsp route 'who calls this function'
   rosslabs-lsp symbols scripts/build.py
   rosslabs-lsp doctor
 
@@ -99,11 +111,21 @@ fn run_as(invoked_as: &str, args: &[String]) -> Result<String, String> {
             acp::cli(&args[1..])
         }
         "compat" => pretty(&compat::cli(&args[1..])?),
+        "route" => route_cli(&args[1..]),
         verb => {
             let kind =
                 Kind::parse(verb).ok_or_else(|| format!("unknown query '{verb}' (try --help)"))?;
-            let target = args.get(1).ok_or("missing <file>[::symbol | :line:col]")?;
             let raw = args.iter().any(|a| a == "--raw");
+            if let Some(name) = flag_value(args, "--symbol")? {
+                if !kind.needs_position() {
+                    return Err(format!(
+                        "--symbol applies to def, refs and hover; {verb} takes a file"
+                    ));
+                }
+                let path = flag_value(args, "--path")?;
+                return pretty(&query::run_named(kind, &name, path.as_deref(), raw)?);
+            }
+            let target = args.get(1).ok_or("missing <file>[::symbol | :line:col]")?;
             let (file, sel) = selector::Selector::parse(target);
             if kind.needs_position() && !sel.is_point() {
                 return Err(format!(
@@ -112,6 +134,44 @@ fn run_as(invoked_as: &str, args: &[String]) -> Result<String, String> {
             }
             pretty(&query::run(kind, &file, sel, raw)?)
         }
+    }
+}
+
+/// Value of `--flag VALUE` or `--flag=VALUE`. A flag with no value is an error.
+fn flag_value(args: &[String], flag: &str) -> Result<Option<String>, String> {
+    let prefix = format!("{flag}=");
+    for (i, a) in args.iter().enumerate() {
+        if a == flag {
+            return match args.get(i + 1) {
+                Some(v) if !v.starts_with("--") => Ok(Some(v.clone())),
+                _ => Err(format!("{flag} needs a value")),
+            };
+        }
+        if let Some(v) = a.strip_prefix(&prefix) {
+            return Ok(Some(v.to_string()));
+        }
+    }
+    Ok(None)
+}
+
+fn route_cli(args: &[String]) -> Result<String, String> {
+    if args.iter().any(|a| a == "--markdown") {
+        return Ok(route::markdown().trim_end().to_string());
+    }
+    let json = args.iter().any(|a| a == "--json");
+    if let Some(bad) = args.iter().find(|a| a.starts_with("--") && *a != "--json") {
+        return Err(format!("unknown route option {bad}"));
+    }
+    let query: Vec<&str> = args
+        .iter()
+        .filter(|a| !a.starts_with("--"))
+        .map(String::as_str)
+        .collect();
+    let result = route::lookup(&query.join(" "));
+    if json {
+        pretty(&result)
+    } else {
+        Ok(route::text(&result))
     }
 }
 
@@ -148,6 +208,28 @@ mod tests {
     fn point_query_without_position_is_rejected() {
         let err = run(&["def".into(), "src/main.rs".into()]).unwrap_err();
         assert!(err.contains("needs a symbol or position"), "got: {err}");
+    }
+
+    #[test]
+    fn symbol_flag_needs_a_value_and_a_point_query() {
+        let err = run(&["refs".into(), "--symbol".into()]).unwrap_err();
+        assert!(err.contains("needs a value"), "got: {err}");
+        let err = run(&["symbols".into(), "--symbol".into(), "x".into()]).unwrap_err();
+        assert!(err.contains("applies to def"), "got: {err}");
+    }
+
+    #[test]
+    fn route_prints_text_json_and_markdown() {
+        let text = run(&["route".into(), "rust".into()]).unwrap();
+        assert!(text.contains("rust-analyzer"), "got: {text}");
+        let json: serde_json::Value =
+            serde_json::from_str(&run(&["route".into(), "hooks".into(), "--json".into()]).unwrap())
+                .unwrap();
+        assert_eq!(json["matches"][0]["id"], "agent-hooks");
+        assert!(run(&["route".into(), "--markdown".into()])
+            .unwrap()
+            .starts_with("<!--"));
+        assert!(run(&["route".into(), "--bogus".into()]).is_err());
     }
 
     #[test]

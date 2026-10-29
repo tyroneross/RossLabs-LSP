@@ -1,0 +1,9 @@
+{
+  "name": "lsp-routing-hint",
+  "description": "Non-blocking PreToolUse hint: when Grep or a shell rg/grep searches for a bare code identifier in a repo with a ready language server, it suggests the exact `rosslabs-lsp refs --symbol` call. Never blocks; silent otherwise. Requires python3 and rosslabs-lsp on PATH.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Tyrone Ross",
+    "email": "tyrone@rosslabs.ai"
+  }
+}

@@ -21,6 +21,18 @@ use std::time::{Duration, Instant};
 
 const PROTOCOL_VERSION: &str = "2025-06-18";
 
+/// Returned from `initialize`. Hosts that defer tool schemas still surface
+/// server instructions, so the routing rule reaches the model before any
+/// tool is loaded.
+const INSTRUCTIONS: &str = "RossLabs LSP answers code questions with compiler accuracy. \
+Use def / refs / hover for cross-file symbol questions (where is X defined, who calls X, what type is X), \
+diag for type and compile errors in a file, and symbols for a file outline. \
+Pass `symbol` (a name such as \"my_function\" or \"MyType/method\") instead of line/column; no position is needed. \
+Use grep/rg instead for strings, config, prose, logs and languages without a server. \
+Every answer carries `ready`: when it is false, an empty result means unknown, not none, so fall back to grep. \
+Call `doctor` to see which languages have a ready server, and `route` with a question or topic \
+(a language, hooks, ACP, terminal input, a host) when unsure which tool applies.";
+
 /// Millis since process start when the last inbound frame arrived (L4).
 static LAST_FRAME_MS: AtomicU64 = AtomicU64::new(0);
 
@@ -76,7 +88,8 @@ fn handle(req: &Value) -> Option<Value> {
         "initialize" => Ok(json!({
             "protocolVersion": PROTOCOL_VERSION,
             "capabilities": {"tools": {}},
-            "serverInfo": {"name": "rosslabs-lsp", "version": env!("CARGO_PKG_VERSION")}
+            "serverInfo": {"name": "rosslabs-lsp", "version": env!("CARGO_PKG_VERSION")},
+            "instructions": INSTRUCTIONS
         })),
         "tools/list" => Ok(json!({"tools": tool_list()})),
         "tools/call" => call_tool(req.get("params").unwrap_or(&Value::Null)),
@@ -106,6 +119,10 @@ fn call_tool(params: &Value) -> Result<Value, String> {
             Ok(v) => tool_result(&v, false),
             Err(e) => tool_result(&json!({"error": e}), true),
         });
+    }
+    if name == "route" {
+        let query = args.get("query").and_then(Value::as_str).unwrap_or("");
+        return Ok(tool_result(&crate::route::lookup(query), false));
     }
     if name == "compat" {
         let result = (|| {
@@ -217,12 +234,19 @@ fn tool_list() -> Vec<Value> {
                 "component":{"type":"string","description":"Exact component name, case insensitive"}
             },"required":["registry"],"additionalProperties":false}
         }),
-        point("def", "Resolve the definition of the symbol at a position. Compiler-accurate, unlike text search."),
-        point("refs", "Find every reference to the symbol at a position, across files."),
-        point("hover", "Inferred type and documentation for the symbol at a position."),
-        whole("symbols", "Outline every top-level symbol in a file."),
+        point("def", "Where is this symbol defined? Compiler-accurate across files, re-exports and overloads, where grep matches every same-named string. Prefer over grep for any code identifier. Pass `symbol` (a name, no position needed) or line/column. `ready: false` means unknown: fall back to grep."),
+        point("refs", "Who uses or calls this symbol? Every reference across the workspace, each named by its containing function, declaration excluded. Prefer over grep for identifiers: it skips comments, strings and unrelated same-named symbols. Pass `symbol` (a name, no position needed) or line/column. `ready: false` means unknown, not none."),
+        point("hover", "What type, signature and docs does this symbol have, as the compiler infers them? Prefer over reading source when types are inferred or generic. Pass `symbol` (a name, no position needed) or line/column."),
+        whole("symbols", "Outline every symbol a file defines (functions, types, methods) with lines. Prefer over grepping for `fn `/`def `/`class `. Use the names it returns as `symbol` for def/refs/hover."),
         whole("diag", "Type and compile diagnostics for a file."),
         whole("ui", "Map dpl-* source classes to sibling CSS and report icon, text, and accessibility surfaces."),
+        json!({
+            "name": "route",
+            "description": "Which tool answers this? Matches a question or topic (e.g. \"who calls X\", \"rust\", \"hooks\", \"acp\", \"codex\") against the routing index by question, language, component and host. Offline; no language server is started.",
+            "inputSchema": {"type": "object", "properties": {
+                "query": {"type": "string", "description": "Question or topic; empty returns the whole index"}
+            }, "additionalProperties": false}
+        }),
         json!({
             "name": "doctor",
             "description": "Report which language servers are registered and installed.",
@@ -337,6 +361,17 @@ mod tests {
         let r = handle(&json!({"jsonrpc":"2.0","id":1,"method":"initialize"})).unwrap();
         assert_eq!(r["result"]["serverInfo"]["name"], "rosslabs-lsp");
         assert!(r["result"]["capabilities"]["tools"].is_object());
+        let instructions = r["result"]["instructions"].as_str().unwrap();
+        assert!(instructions.contains("grep") && instructions.contains("route"));
+    }
+
+    #[test]
+    fn route_tool_matches_the_cli_index() {
+        let out = call_tool(&json!({"name":"route","arguments":{"query":"rust"}})).unwrap();
+        assert_eq!(out["isError"], false);
+        let body: Value =
+            serde_json::from_str(out["content"][0]["text"].as_str().unwrap()).unwrap();
+        assert_eq!(body, crate::route::lookup("rust"));
     }
 
     #[test]
@@ -354,6 +389,7 @@ mod tests {
             );
             assert!(
                 name == "doctor"
+                    || name == "route"
                     || name == "compat"
                     || name == "acp_doctor"
                     || Kind::parse(name).is_some(),

@@ -1,0 +1,17 @@
+{
+  "description": "Non-blocking hint: a grep for a bare code identifier suggests the equivalent rosslabs-lsp refs/def call.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Grep|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/lsp_routing_hint.py\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

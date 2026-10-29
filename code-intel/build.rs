@@ -11,6 +11,55 @@
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
+use std::process::Command;
+
+/// Run git and return trimmed stdout, or None when git or the repo is absent
+/// (a source tarball, a sandboxed build).
+fn git(args: &[&str]) -> Option<String> {
+    let out = Command::new("git").args(args).output().ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    let s = String::from_utf8(out.stdout).ok()?.trim().to_string();
+    (!s.is_empty()).then_some(s)
+}
+
+/// Stamp the commit and build date that `doctor` prints, so an install that
+/// predates a feature is visible instead of failing with "unknown query".
+fn stamp_git() {
+    // Re-run when HEAD moves; otherwise cargo would keep a stale commit.
+    for path in [
+        git(&["rev-parse", "--git-path", "HEAD"]),
+        git(&["symbolic-ref", "-q", "HEAD"]).and_then(|r| git(&["rev-parse", "--git-path", &r])),
+        git(&["rev-parse", "--git-path", "packed-refs"]),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        println!("cargo:rerun-if-changed={path}");
+    }
+    let commit = git(&["rev-parse", "--short=12", "HEAD"])
+        .map(|c| {
+            let dirty = git(&["status", "--porcelain", "--untracked-files=no"]).is_some();
+            if dirty {
+                format!("{c}-dirty")
+            } else {
+                c
+            }
+        })
+        .unwrap_or_else(|| "unknown".into());
+    let date = Command::new("date")
+        .args(["-u", "+%Y-%m-%dT%H:%M:%SZ"])
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "unknown".into());
+    println!("cargo:rustc-env=ROSSLABS_LSP_BUILD_COMMIT={commit}");
+    println!("cargo:rustc-env=ROSSLABS_LSP_BUILD_DATE={date}");
+}
 
 fn collect(dir: &Path, out: &mut Vec<PathBuf>) {
     let Ok(entries) = std::fs::read_dir(dir) else {
@@ -29,6 +78,7 @@ fn collect(dir: &Path, out: &mut Vec<PathBuf>) {
 fn main() {
     println!("cargo:rerun-if-changed=src");
     println!("cargo:rerun-if-changed=Cargo.toml");
+    stamp_git();
     let mut files = Vec::new();
     collect(Path::new("src"), &mut files);
     files.sort();

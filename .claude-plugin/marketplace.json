@@ -14,6 +14,12 @@
       "description": "Registers ty (Astral) as Claude Code's Python language server: definitions, references, hover, call hierarchy. Requires `ty` on PATH (`uv tool install ty`). Python only -- Claude's built-in LSP tool answers incompletely on unregistered languages, so use RossLabs LSP for anything else.",
       "source": "./plugins/ty-lsp",
       "category": "development"
+    },
+    {
+      "name": "lsp-routing-hint",
+      "description": "Non-blocking PreToolUse hint: a Grep or shell rg/grep for a bare code identifier in a repo with a ready language server suggests the exact `rosslabs-lsp refs --symbol` call. Silent otherwise; never blocks.",
+      "source": "./plugins/lsp-routing-hint",
+      "category": "development"
     }
   ]
 }

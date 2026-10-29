@@ -12,6 +12,12 @@ repo closes that gap in two layers.
 |---|---|---|
 | **[RossLabs LSP CLI](code-intel/)** | A Rust implementation that fronts any language server as a **CLI** and as an **MCP server** | Any agent — Claude Code, Codex, local models, CI, git hooks |
 | **[`plugins/ty-lsp/`](plugins/ty-lsp/)** | A Claude Code plugin registering `ty` as the Python language server | Claude Code only |
+| **[`plugins/lsp-routing-hint/`](plugins/lsp-routing-hint/)** | A non-blocking PreToolUse hook that turns a grep for a bare identifier into a suggested `rosslabs-lsp refs` call | Claude Code and Codex |
+
+**Which tool answers which question?** See [ROUTING.md](ROUTING.md), by question,
+language, component (hooks, ACP, terminal input, ...) and host. Ask it from a shell
+with `rosslabs-lsp route <topic>` or over MCP with the `route` tool. It is rendered
+from [`routing.json`](routing.json), the machine-readable source.
 
 ## Why two layers
 
@@ -44,9 +50,17 @@ carries no such signal.
 
 ```bash
 cd code-intel && cargo install --path . --locked --force
-rosslabs-lsp doctor                            # which language servers are present
+rosslabs-lsp doctor                            # servers present, plus this build's commit and date
 rosslabs-lsp refs src/query.rs::workspace_root # every caller of a symbol
+rosslabs-lsp refs --symbol workspace_root      # same, found by name from the current directory
+rosslabs-lsp route "who calls this"            # which tool answers a question
 ```
+
+`def`, `refs` and `hover` accept `--symbol <name> [--path <root-or-file>]`. With a
+directory (default `.`), files that mention the name are checked against their
+own symbol trees and exactly one defining file must remain; several are refused
+with the list. `doctor` prints `build.commit` and `build.date`, so an install
+older than a feature is visible before a command fails as "unknown query".
 
 **Address symbols by name, not by line.** `file.rs:42:11` breaks the moment
 anything above line 42 moves, and it breaks *silently* — the query resolves to
@@ -90,6 +104,11 @@ args = ["mcp"]
 MCP_IDLE_TIMEOUT_MS = "1800000"
 ```
 
+The server returns routing `instructions` from `initialize` (symbol questions to
+def/refs/hover, text to grep, `route` when unsure, check `ready`), so hosts that
+defer tool schemas still see the rule. In Claude Code the tools are deferred:
+load them with ToolSearch `rosslabs-lsp`.
+
 ## ACP agent doctor
 
 `rosslabs-lsp acp doctor` checks the coding agents installed on this machine
@@ -117,7 +136,11 @@ nonzero. MCP exposes the same check as the `acp_doctor` tool.
 ```
 /plugin marketplace add tyroneross/RossLabs-LSP
 /plugin install ty-lsp@rosslabs-lsp
+/plugin install lsp-routing-hint@rosslabs-lsp   # optional grep -> LSP hint
 ```
+
+Codex and settings-file installs of the hint are in
+[plugins/lsp-routing-hint/README.md](plugins/lsp-routing-hint/README.md).
 
 ## Language coverage
 

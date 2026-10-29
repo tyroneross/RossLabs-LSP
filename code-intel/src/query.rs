@@ -118,6 +118,207 @@ pub fn run(kind: Kind, file: &str, sel: Selector, raw: bool) -> Result<Value, St
     run_with_client(kind, &abs, &sel, &root, server, &mut client, raw)
 }
 
+/// Directories never worth scanning for a symbol: VCS data, build output,
+/// dependency trees. Hidden directories are skipped as well.
+const SKIP_DIRS: &[&str] = &[
+    "target",
+    "node_modules",
+    "build",
+    "dist",
+    "out",
+    "vendor",
+    "__pycache__",
+    "DerivedData",
+];
+const MAX_SCAN_FILES: usize = 20_000;
+const MAX_SCAN_BYTES: u64 = 1024 * 1024;
+const MAX_CANDIDATES: usize = 40;
+
+/// Resolve a symbol by name without a file, for shell-only hosts.
+///
+/// `path` may be a file (resolved exactly like MCP's `{file, symbol}`) or a
+/// directory, default the current one. For a directory, files of a registered
+/// language that contain the name as a whole word are candidates; each
+/// candidate's own symbol tree decides whether it *defines* the name, using
+/// the same `selector::resolve_symbol` the MCP path uses. Exactly one
+/// defining file is required: several are refused with the list, never
+/// guessed.
+pub fn run_named(kind: Kind, name: &str, path: Option<&str>, raw: bool) -> Result<Value, String> {
+    let symbol_path: Vec<String> = name
+        .split('/')
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+        .collect();
+    let leaf = symbol_path
+        .last()
+        .cloned()
+        .ok_or("--symbol needs a non-empty name")?;
+    let base = leaf.split('(').next().unwrap_or(&leaf).trim().to_string();
+    let target = path.unwrap_or(".");
+    let meta = std::fs::metadata(target).map_err(|e| format!("cannot resolve {target}: {e}"))?;
+    if meta.is_file() {
+        return run(
+            kind,
+            target,
+            Selector::Symbol {
+                path: symbol_path.clone(),
+            },
+            raw,
+        );
+    }
+
+    let root_dir = std::fs::canonicalize(target).map_err(|e| e.to_string())?;
+    let mut files = Vec::new();
+    let mut scanned = 0usize;
+    scan_candidates(&root_dir, &base, &mut files, &mut scanned);
+    if files.is_empty() {
+        return Err(format!(
+            "no file of a supported language under {} mentions '{base}' (scanned {scanned} files); try rg -w '{base}'",
+            root_dir.display()
+        ));
+    }
+    files.truncate(MAX_CANDIDATES);
+
+    // One client per server, reused across that server's candidate files.
+    let mut clients: Vec<(&'static str, Client)> = Vec::new();
+    let mut defining: Vec<(String, &'static registry::Server)> = Vec::new();
+    let mut ambiguous: Vec<String> = Vec::new();
+    let mut last_err = String::new();
+    for file in &files {
+        let Some(server) = registry::for_path(file) else {
+            continue;
+        };
+        if !registry::is_installed(server) {
+            last_err = format!("{} is not installed — {}", server.command, server.install);
+            continue;
+        }
+        let idx = match clients.iter().position(|(c, _)| *c == server.command) {
+            Some(i) => i,
+            None => {
+                let root = workspace_root(std::path::Path::new(file));
+                match Client::start(server, &root) {
+                    Ok(c) => {
+                        clients.push((server.command, c));
+                        clients.len() - 1
+                    }
+                    Err(e) => {
+                        last_err = e;
+                        continue;
+                    }
+                }
+            }
+        };
+        let client = &mut clients[idx].1;
+        let Ok(uri) = client.open(file, server.language_id) else {
+            continue;
+        };
+        let tree = client
+            .request(
+                "textDocument/documentSymbol",
+                json!({"textDocument": {"uri": uri}}),
+            )
+            .unwrap_or(Value::Null);
+        match selector::resolve_symbol(&tree, &symbol_path) {
+            Ok(_) => defining.push((file.clone(), server)),
+            Err(e) if e.contains("ambiguous") => ambiguous.push(format!("{file}: {e}")),
+            Err(_) => {}
+        }
+    }
+
+    match (defining.len(), ambiguous.len()) {
+        (1, 0) => {
+            let (file, server) = defining.remove(0);
+            if daemon::is_poolable(server) {
+                // Hand off to the warm pool: the discovery client never
+                // indexed the workspace, the pooled one may have.
+                drop(clients);
+                return run(kind, &file, Selector::Symbol { path: symbol_path }, raw);
+            }
+            let root = workspace_root(std::path::Path::new(&file));
+            let idx = clients
+                .iter()
+                .position(|(c, _)| *c == server.command)
+                .expect("client exists for the defining file");
+            let sel = Selector::Symbol { path: symbol_path };
+            run_with_client(kind, &file, &sel, &root, server, &mut clients[idx].1, raw)
+        }
+        (0, 0) => Err(format!(
+            "no file defines '{name}' among {} candidate files that mention it{}; pass --path <file> or use rg -w '{base}'",
+            files.len(),
+            if last_err.is_empty() {
+                String::new()
+            } else {
+                format!(" (last error: {last_err})")
+            }
+        )),
+        _ => {
+            let mut list: Vec<String> = defining.into_iter().map(|(f, _)| f).collect();
+            list.extend(ambiguous);
+            Err(format!(
+                "'{name}' is defined in more than one place: {}. Pass --path <file> or qualify it as Parent/{leaf}",
+                list.join("; ")
+            ))
+        }
+    }
+}
+
+fn scan_candidates(dir: &std::path::Path, word: &str, out: &mut Vec<String>, scanned: &mut usize) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    let mut entries: Vec<_> = entries.flatten().collect();
+    entries.sort_by_key(|e| e.file_name());
+    for entry in entries {
+        if *scanned >= MAX_SCAN_FILES {
+            return;
+        }
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        let Ok(ft) = entry.file_type() else { continue };
+        let path = entry.path();
+        if ft.is_dir() {
+            if name.starts_with('.') || SKIP_DIRS.contains(&name.as_ref()) {
+                continue;
+            }
+            scan_candidates(&path, word, out, scanned);
+        } else if ft.is_file() {
+            let p = path.to_string_lossy().into_owned();
+            if registry::for_path(&p).is_none() {
+                continue;
+            }
+            *scanned += 1;
+            if entry.metadata().is_ok_and(|m| m.len() > MAX_SCAN_BYTES) {
+                continue;
+            }
+            if let Ok(text) = std::fs::read_to_string(&path) {
+                if contains_word(&text, word) {
+                    out.push(p);
+                }
+            }
+        }
+    }
+}
+
+/// True when `word` occurs in `text` bounded by non-identifier characters.
+fn contains_word(text: &str, word: &str) -> bool {
+    if word.is_empty() {
+        return false;
+    }
+    let is_ident = |c: char| c.is_alphanumeric() || c == '_' || c == '$';
+    let mut start = 0;
+    while let Some(i) = text[start..].find(word) {
+        let at = start + i;
+        let end = at + word.len();
+        let before = text[..at].chars().next_back();
+        let after = text[end..].chars().next();
+        if !before.is_some_and(is_ident) && !after.is_some_and(is_ident) {
+            return true;
+        }
+        start = end;
+    }
+    false
+}
+
 /// Run against an initialized client. The direct CLI/MCP path and daemon path
 /// intentionally share this function so pooling cannot change output shape.
 pub(crate) fn run_with_client(
@@ -409,7 +610,23 @@ pub fn doctor() -> Value {
         .collect();
     let installed = servers.iter().filter(|s| s["installed"] == true).count();
     let ready = servers.iter().filter(|s| s["ready"] == true).count();
-    json!({"installed": installed, "ready": ready, "total": servers.len(), "servers": servers})
+    json!({
+        "build": build_info(),
+        "installed": installed,
+        "ready": ready,
+        "total": servers.len(),
+        "servers": servers,
+    })
+}
+
+/// Which source this binary was built from, so a stale install is visible.
+pub fn build_info() -> Value {
+    json!({
+        "version": env!("CARGO_PKG_VERSION"),
+        "commit": env!("ROSSLABS_LSP_BUILD_COMMIT"),
+        "date": env!("ROSSLABS_LSP_BUILD_DATE"),
+        "id": env!("ROSSLABS_LSP_BUILD_ID"),
+    })
 }
 
 #[cfg(test)]
@@ -451,6 +668,33 @@ mod tests {
             .unwrap()
             .iter()
             .all(|s| s["ready"].is_boolean()));
+    }
+
+    #[test]
+    fn doctor_reports_its_build() {
+        let b = &doctor()["build"];
+        for key in ["version", "commit", "date", "id"] {
+            assert!(
+                b[key].as_str().is_some_and(|s| !s.is_empty()),
+                "build.{key} missing"
+            );
+        }
+    }
+
+    #[test]
+    fn contains_word_respects_identifier_boundaries() {
+        assert!(contains_word("fn run_named(x)", "run_named"));
+        assert!(!contains_word("fn run_named_x()", "run_named"));
+        assert!(!contains_word("xrun_named", "run_named"));
+        assert!(contains_word("run_named", "run_named"));
+    }
+
+    #[test]
+    fn named_lookup_without_any_mention_is_refused_before_spawning() {
+        // Built at runtime so this source file does not itself mention it.
+        let name = format!("{}{}", "zz_no_such", "_symbol_qq");
+        let err = run_named(Kind::References, &name, Some("src"), false).unwrap_err();
+        assert!(err.contains("mentions"), "got: {err}");
     }
 
     #[test]
