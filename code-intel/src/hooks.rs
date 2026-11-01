@@ -554,16 +554,39 @@ fn codex_plugin_hooks(home: &Path, findings: &mut Vec<Value>) -> Vec<(PathBuf, &
     let mut out = Vec::new();
     for (name, market) in enabled {
         let base = home.join(".codex/plugins/cache").join(&market).join(&name);
-        // Several cached versions can coexist; the newest directory is the one in use.
-        let newest = fs::read_dir(&base).ok().and_then(|entries| {
-            entries
-                .filter_map(|e| e.ok())
-                .filter(|e| e.path().is_dir())
-                .max_by_key(|e| e.metadata().and_then(|m| m.modified()).ok())
-                .map(|e| e.path())
-        });
+        // Candidate discovery: prefer the installed latest alias; native activation is separate.
+        let newest = if base.join("latest").is_dir() {
+            Some(base.join("latest"))
+        } else {
+            fs::read_dir(&base).ok().and_then(|entries| {
+                entries
+                    .filter_map(|e| e.ok())
+                    .filter(|e| e.path().is_dir())
+                    .max_by_key(|e| e.metadata().and_then(|m| m.modified()).ok())
+                    .map(|e| e.path())
+            })
+        };
         if let Some(dir) = newest {
-            let hooks = dir.join("hooks/hooks.json");
+            let manifest = dir.join(".codex-plugin/plugin.json");
+            let selected = fs::read(&manifest)
+                .ok()
+                .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok())
+                .and_then(|value| {
+                    value
+                        .get("hooks")
+                        .and_then(|h| h.as_str())
+                        .map(str::to_owned)
+                })
+                .unwrap_or_else(|| "hooks/hooks.json".to_string());
+            let relative = Path::new(&selected);
+            if relative.is_absolute()
+                || relative
+                    .components()
+                    .any(|part| matches!(part, std::path::Component::ParentDir))
+            {
+                continue;
+            }
+            let hooks = dir.join(relative);
             if hooks.is_file() {
                 out.push((hooks, "plugin"));
             }
@@ -1608,6 +1631,23 @@ mod tests {
     fn write(path: &Path, body: &str) {
         fs::create_dir_all(path.parent().unwrap()).unwrap();
         fs::write(path, body).unwrap();
+    }
+
+    #[test]
+    fn codex_plugin_respects_manifest_selected_file() {
+        let (fixture, env) = fixture("manifest-file");
+        let root = env.home.join(".codex/plugins/cache/local/demo/1.0.0");
+        write(
+            &root.join(".codex-plugin/plugin.json"),
+            r#"{"hooks":"./hooks/codex.json"}"#,
+        );
+        write(&root.join("hooks/codex.json"), r#"{"hooks":{}}"#);
+        let paths = codex_plugin_hooks(&env.home, &mut vec![]);
+        assert!(paths.iter().any(|(p, _)| p.ends_with("hooks/codex.json")));
+        assert!(!paths
+            .iter()
+            .any(|(p, _)| p.starts_with(&root) && p.ends_with("hooks/hooks.json")));
+        drop(fixture);
     }
 
     fn fake_bin(dir: &Path, name: &str, out: &str) {
