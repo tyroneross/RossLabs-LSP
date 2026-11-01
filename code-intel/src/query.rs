@@ -59,6 +59,8 @@ pub fn workspace_root(path: &std::path::Path) -> String {
         "Cargo.toml",
         "pyproject.toml",
         "package.json",
+        "jsconfig.json",
+        "tsconfig.json",
         "go.mod",
         "Package.swift",
         "compile_commands.json",
@@ -209,7 +211,8 @@ pub fn run_named(kind: Kind, name: &str, path: Option<&str>, raw: bool) -> Resul
             }
         };
         let client = &mut clients[idx].1;
-        let Ok(uri) = client.open(file, server.language_id) else {
+        let language = registry::document_language_id(file).unwrap_or(server.language_id);
+        let Ok(uri) = client.open(file, language) else {
             continue;
         };
         let tree = client
@@ -330,7 +333,8 @@ pub(crate) fn run_with_client(
     client: &mut Client,
     raw: bool,
 ) -> Result<Value, String> {
-    let uri = client.open(abs, server.language_id)?;
+    let language = registry::document_language_id(abs).unwrap_or(server.language_id);
+    let uri = client.open(abs, language)?;
 
     // Whether the server produced a usable answer rather than an early empty.
     let mut ready = true;
@@ -382,11 +386,12 @@ pub(crate) fn run_with_client(
             // signal: rust-analyzer answers `[]` in milliseconds before it has
             // begun reporting progress at all, so a one-shot query silently
             // returns a false negative. Asking again until it answers is the
-            // only signal that works across every server.
+            // readiness policy for those indexers; completed TS/JS requests are
+            // handled separately below.
             let deadline = std::time::Instant::now() + INDEX_BUDGET;
             let answer;
             loop {
-                client.wait_until_idle(Duration::from_secs(2));
+                let idle = client.wait_until_idle(Duration::from_secs(2));
                 let attempt = client.request(method, params.clone());
                 let a = match attempt {
                     Ok(a) => a,
@@ -400,9 +405,14 @@ pub(crate) fn run_with_client(
                     Err(e) => return Err(e),
                 };
                 let empty = matches!(&a, Value::Null) || a.as_array().is_some_and(|x| x.is_empty());
-                if !empty || std::time::Instant::now() >= deadline {
-                    ready = !empty;
-                    if !empty {
+                // The TS/JS adapter awaits tsserver's completed semantic
+                // request. No definitions/references is a valid result, not
+                // a cold rust-analyzer indexing signal. Still honor explicit
+                // loading progress and retryable cancellation responses.
+                let completed_empty = idle && server.command == "typescript-language-server";
+                if !empty || completed_empty || std::time::Instant::now() >= deadline {
+                    ready = !empty || completed_empty;
+                    if ready {
                         client.mark_proven_ready();
                     }
                     answer = a;
@@ -526,7 +536,9 @@ fn annotate_containers(client: &mut Client, server: &registry::Server, result: &
             if !trees.contains_key(&uri) {
                 let path = uri.strip_prefix("file://").unwrap_or(&uri);
                 let decoded = percent_decode(path);
-                let opened = client.open(&decoded, server.language_id).is_ok();
+                let language =
+                    registry::document_language_id(&decoded).unwrap_or(server.language_id);
+                let opened = client.open(&decoded, language).is_ok();
                 let tree = if opened {
                     client
                         .request(
@@ -652,6 +664,23 @@ mod tests {
         let here = std::env::current_dir().unwrap();
         let root = workspace_root(&here.join("src").join("query.rs"));
         assert!(std::path::Path::new(&root).join("Cargo.toml").exists());
+    }
+
+    #[test]
+    fn nested_javascript_config_is_the_project_root() {
+        let root = std::env::temp_dir().join(format!("lsp-js-root-{}", std::process::id()));
+        let plugin = root.join("plugins/planner");
+        std::fs::create_dir_all(root.join(".git")).unwrap();
+        std::fs::create_dir_all(&plugin).unwrap();
+        for marker in ["jsconfig.json", "tsconfig.json"] {
+            std::fs::write(plugin.join(marker), "{}").unwrap();
+            assert_eq!(
+                workspace_root(&plugin.join("main.js")),
+                plugin.to_string_lossy()
+            );
+            std::fs::remove_file(plugin.join(marker)).unwrap();
+        }
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

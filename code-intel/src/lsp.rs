@@ -10,9 +10,10 @@
 //! population documented in easy-terminal/docs/lsp-memory-rca.md.
 
 use crate::registry::{self, Server};
+use lsp_server::Message;
 use serde_json::{json, Value};
 use std::collections::HashMap;
-use std::io::{BufRead, BufReader, Read, Write};
+use std::io::{BufRead, BufReader, Write};
 use std::os::unix::process::CommandExt;
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError};
@@ -304,9 +305,8 @@ impl Client {
     }
 
     fn send(&mut self, msg: Value) -> Result<(), String> {
-        let body = serde_json::to_vec(&msg).map_err(|e| e.to_string())?;
-        write!(self.stdin, "Content-Length: {}\r\n\r\n", body.len()).map_err(|e| e.to_string())?;
-        self.stdin.write_all(&body).map_err(|e| e.to_string())?;
+        let message: Message = serde_json::from_value(msg).map_err(|e| e.to_string())?;
+        message.write(&mut self.stdin).map_err(|e| e.to_string())?;
         self.stdin.flush().map_err(|e| e.to_string())
     }
 
@@ -324,40 +324,13 @@ impl Client {
 /// Reader thread: parse Content-Length framed JSON off the server's stdout
 /// until the pipe closes. Errors end the thread, which disconnects the channel
 /// and surfaces to the caller as a closed connection.
-fn read_frames(mut out: BufReader<std::process::ChildStdout>, tx: mpsc::Sender<Value>) {
-    loop {
-        let mut len = 0usize;
-        loop {
-            let mut line = String::new();
-            match out.read_line(&mut line) {
-                Ok(0) | Err(_) => return,
-                Ok(_) => {}
-            }
-            let t = line.trim_end();
-            if t.is_empty() {
-                break;
-            }
-            if let Some(v) = t.strip_prefix("Content-Length:") {
-                match v.trim().parse() {
-                    Ok(n) => len = n,
-                    Err(_) => return,
-                }
-            }
-        }
-        if len == 0 {
-            continue;
-        }
-        let mut buf = vec![0u8; len];
-        if out.read_exact(&mut buf).is_err() {
+fn read_frames(mut out: impl BufRead, tx: mpsc::Sender<Value>) {
+    while let Ok(Some(message)) = Message::read(&mut out) {
+        let Ok(value) = serde_json::to_value(message) else {
             return;
-        }
-        match serde_json::from_slice(&buf) {
-            Ok(v) => {
-                if tx.send(v).is_err() {
-                    return;
-                }
-            }
-            Err(_) => return,
+        };
+        if tx.send(value).is_err() {
+            return;
         }
     }
 }

@@ -19,6 +19,10 @@ language, component (hooks, ACP, terminal input, ...) and host. Ask it from a sh
 with `rosslabs-lsp route <topic>` or over MCP with the `route` tool. It is rendered
 from [`routing.json`](routing.json), the machine-readable source.
 
+JavaScript and JSX use their own document language IDs through the shared
+TypeScript server. See [JavaScript support and protocol library decisions](docs/javascript-support.md)
+for the adapter behavior, incorporated framing library and real-server tests.
+
 ## Why two layers
 
 `lspServers` is a Claude Code plugin key. It works well and costs nothing — but it

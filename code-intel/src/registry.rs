@@ -76,6 +76,20 @@ pub fn for_path(path: &str) -> Option<&'static Server> {
         .find(|s| s.extensions.iter().any(|e| *e == ext))
 }
 
+/// A server executable can handle several document languages. In particular,
+/// tsserver uses the didOpen language ID to choose JS, JSX, TS or TSX parsing;
+/// the adapter's pool key is not the document's language.
+pub fn document_language_id(path: &str) -> Option<&'static str> {
+    let server = for_path(path)?;
+    let ext = path[path.rfind('.')?..].to_ascii_lowercase();
+    Some(match ext.as_str() {
+        ".js" | ".mjs" | ".cjs" => "javascript",
+        ".jsx" => "javascriptreact",
+        ".tsx" => "typescriptreact",
+        _ => server.language_id,
+    })
+}
+
 /// Find a server by the command used as the daemon pool key.
 pub fn by_command(command: &str) -> Option<&'static Server> {
     SERVERS.iter().find(|server| server.command == command)
@@ -194,6 +208,22 @@ mod tests {
                 assert!(e.starts_with('.'), "extension {e} missing leading dot");
             }
         }
+    }
+
+    #[test]
+    fn document_language_is_distinct_from_the_shared_server() {
+        for (path, language) in [
+            ("plugin.js", "javascript"),
+            ("module.MJS", "javascript"),
+            ("module.cjs", "javascript"),
+            ("view.jsx", "javascriptreact"),
+            ("types.d.ts", "typescript"),
+            ("view.tsx", "typescriptreact"),
+            ("main.rs", "rust"),
+        ] {
+            assert_eq!(document_language_id(path), Some(language), "{path}");
+        }
+        assert_eq!(document_language_id("unknown.txt"), None);
     }
 
     #[test]
