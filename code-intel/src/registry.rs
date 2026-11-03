@@ -59,6 +59,14 @@ pub const SERVERS: &[Server] = &[
         measured_cold_start: None,
     },
     Server {
+        language_id: "css",
+        command: "vscode-css-language-server",
+        args: &["--stdio"],
+        extensions: &[".css", ".scss", ".less"],
+        install: "npm i -g vscode-langservers-extracted@4.10.0",
+        measured_cold_start: None,
+    },
+    Server {
         language_id: "c",
         command: "clangd",
         args: &[],
@@ -86,6 +94,8 @@ pub fn document_language_id(path: &str) -> Option<&'static str> {
         ".js" | ".mjs" | ".cjs" => "javascript",
         ".jsx" => "javascriptreact",
         ".tsx" => "typescriptreact",
+        ".scss" => "scss",
+        ".less" => "less",
         _ => server.language_id,
     })
 }
@@ -220,6 +230,9 @@ mod tests {
             ("types.d.ts", "typescript"),
             ("view.tsx", "typescriptreact"),
             ("main.rs", "rust"),
+            ("home.css", "css"),
+            ("theme.SCSS", "scss"),
+            ("theme.less", "less"),
         ] {
             assert_eq!(document_language_id(path), Some(language), "{path}");
         }

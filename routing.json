@@ -105,6 +105,23 @@
       "notes": "Needs a TypeScript install with lib/tsserver.js (or ROSSLABS_LSP_TSSERVER_PATH). Not pooled: each CLI query pays ~2 s."
     },
     {
+      "id": "css",
+      "dimension": "language",
+      "topic": "CSS / SCSS / Less (.css, .scss, .less)",
+      "keywords": [
+        "css",
+        "scss",
+        "less",
+        "stylesheet",
+        "stylesheets",
+        "selectors"
+      ],
+      "use": "server: vscode-css-language-server",
+      "mcp": "diag {file}; doctor",
+      "cli": "rosslabs-lsp diag <stylesheet>; rosslabs-lsp doctor",
+      "notes": "Optional MIT-licensed vscode-langservers-extracted@4.10.0, using the VS Code CSS language service. Syntax/lint diagnostics are static; selector matches and layout require rendered checks."
+    },
+    {
       "id": "c",
       "dimension": "language",
       "topic": "C / C++ / Objective-C (.c, .h, .cc, .cpp, .hpp, .m, .mm)",

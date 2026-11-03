@@ -409,7 +409,11 @@ pub(crate) fn run_with_client(
                 // request. No definitions/references is a valid result, not
                 // a cold rust-analyzer indexing signal. Still honor explicit
                 // loading progress and retryable cancellation responses.
-                let completed_empty = idle && server.command == "typescript-language-server";
+                let completed_empty = idle
+                    && matches!(
+                        server.command,
+                        "typescript-language-server" | "vscode-css-language-server"
+                    );
                 if !empty || completed_empty || std::time::Instant::now() >= deadline {
                     ready = !empty || completed_empty;
                     if ready {

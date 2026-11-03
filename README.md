@@ -154,6 +154,7 @@ Codex and settings-file installs of the hint are in
 | Rust | `rust-analyzer` | `brew install rust-analyzer` |
 | Swift | `sourcekit-lsp` | ships with Xcode |
 | TypeScript / JS | `typescript-language-server` + TypeScript with `lib/tsserver.js` | `npm i -g typescript-language-server typescript@6` |
+| CSS / SCSS / Less | `vscode-css-language-server` | `npm i -g vscode-langservers-extracted@4.10.0` |
 | C / C++ / ObjC | `clangd` | ships with Xcode / llvm |
 
 ## Compatibility
@@ -194,3 +195,5 @@ versions the records observed, and the record ids to re-verify. `rosslabs-lsp co
 refresh <registry.json> --section agent-hooks --host ID [--dry-run]` re-reads
 local evidence only (`--version` and transcript fields) and appends revision
 records for drifted `verified` records; documentation records are never rewritten.
+
+CSS diagnostics use the [VS Code CSS language service](https://github.com/microsoft/vscode-css-languageservice) through the optional [MIT-licensed server distribution](https://github.com/hrsh7th/vscode-langservers-extracted). The document language is preserved for CSS, SCSS and Less. A missing server reports an install hint; it never reports the file as clean. Static diagnostics do not establish that a selector matches your rendered application.
