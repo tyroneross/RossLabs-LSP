@@ -142,6 +142,17 @@
       "notes": "No server is registered, so queries are refused with \"no language server registered\"."
     },
     {
+      "id": "rust-test-boundaries",
+      "requires_any": ["rust-test-boundaries", "rust", "rs", "cargo", "crate", "crates"],
+      "dimension": "component",
+      "topic": "Rust test organization and crate boundaries",
+      "keywords": ["rust-test-boundaries", "tests", "testing", "unit", "integration", "cfg", "test-support", "visibility"],
+      "use": "manifests + def/refs + targeted Cargo verification",
+      "mcp": "def {file, symbol}; refs {file, symbol}",
+      "cli": "rosslabs-lsp refs --symbol <name> --path <file>",
+      "notes": "Read manifests/targets/features first. Private unit tests stay in their crate; integration tests use public APIs; shared support is dev-only. Record readiness and cfg/feature/platform scope: empty references do not prove absence across configurations. Rust indexing can execute build scripts/proc macros; use static source/Architect for no-execution reviews. LSP does not discover every test or prove behavior; transport failure means unknown."
+    },
+    {
       "id": "agent-hooks",
       "dimension": "component",
       "topic": "Agent hooks (Claude Code, Codex hook events, payloads, timeouts)",

@@ -39,6 +39,15 @@ const STOPWORDS: &[&str] = &[
 /// Score one route against query tokens: exact keyword or id hits count 2,
 /// a token found inside the topic text counts 1.
 fn score(route: &Value, query: &[String]) -> usize {
+    // Optional scope terms prevent a specialized component route's generic
+    // keywords (for example "unit tests") from hijacking another language.
+    if let Some(scope) = route["requires_any"].as_array() {
+        if !scope.iter().filter_map(Value::as_str).any(|term| {
+            query.iter().any(|token| token.eq_ignore_ascii_case(term))
+        }) {
+            return 0;
+        }
+    }
     let keywords: Vec<String> = route["keywords"]
         .as_array()
         .map(|k| {
@@ -197,6 +206,11 @@ mod tests {
                 !r["keywords"].as_array().unwrap().is_empty(),
                 "{id}: no keywords"
             );
+            if let Some(scope) = r.get("requires_any") {
+                let terms = scope.as_array().expect("requires_any must be an array");
+                assert!(!terms.is_empty(), "{id}: empty applicability scope");
+                assert!(terms.iter().all(|term| term.as_str().is_some_and(|s| !s.is_empty())));
+            }
         }
     }
 
@@ -242,6 +256,13 @@ mod tests {
         let first = |q: &str| lookup(q)["matches"][0]["id"].as_str().unwrap().to_string();
         assert_eq!(first("who calls this function"), "references");
         assert_eq!(first("rust"), "rust");
+        assert_eq!(first("rust unit tests visibility"), "rust-test-boundaries");
+        assert_eq!(first("cargo integration test-support"), "rust-test-boundaries");
+        assert_eq!(first("swift unit tests"), "swift");
+        assert_eq!(first("python unit testing"), "python");
+        assert_eq!(first("javascript integration tests"), "typescript");
+        assert!(!lookup("unit tests")["matches"].as_array().unwrap().iter()
+            .any(|route| route["id"] == "rust-test-boundaries"));
         assert_eq!(first("hooks"), "agent-hooks");
         assert_eq!(first("codex"), "codex");
         assert_eq!(first("search config yaml"), "text-search");
