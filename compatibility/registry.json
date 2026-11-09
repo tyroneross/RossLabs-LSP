@@ -2538,6 +2538,167 @@
         "snapshot": "local files read 2026-10-29",
         "workspace": "not-applicable"
       }
+    },
+    {
+      "capability": "operator-precedence-in-syntax-tree",
+      "cause": "The grammar does not preserve precedence between comparison and logical operators.",
+      "components": [
+        {
+          "name": "tree-sitter-swift",
+          "version": "0.7.4"
+        },
+        {
+          "name": "Code Audit complexity analyzer",
+          "version": "0.2.0"
+        }
+      ],
+      "evidence": [
+        {
+          "observed_at": "2026-11-08",
+          "result": "`a == a && (b || b)` parsed as equality_expression(lhs: a, rhs: conjunction_expression(a, ...)); `a == a` is not a node.",
+          "scope": "One expression in one probe file",
+          "source": "tree dump from a scratch probe built against the analyzer's Cargo.lock; regression case in code-audit skills/code-principles/scripts/test_multilang_complexity.py"
+        }
+      ],
+      "id": "language-tooling.tree-sitter-swift.mixed-operator-precedence@0.7.4",
+      "owner": "Code Audit analyzer (runtime/complexity/src/main.rs)",
+      "remediation": "Do not compare operands of Swift binary expressions; count logical operators by walking the whole expression instead of a connected chain.",
+      "section": "language-tooling",
+      "status": "verified",
+      "symptom": "A check that compares the two sides of a Swift binary expression sees the wrong operands.",
+      "validity": {
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:no"
+        ],
+        "environment": "macOS; tree-sitter 0.27.0",
+        "limitations": [
+          "One grammar version and one expression shape; other operator mixes were not probed."
+        ],
+        "snapshot": "parsed 2026-11-08",
+        "workspace": "not-applicable"
+      }
+    },
+    {
+      "capability": "postfix-non-null-binding-in-syntax-tree",
+      "cause": "The postfix non-null `!` is attached to the whole preceding binary expression.",
+      "components": [
+        {
+          "name": "tree-sitter-typescript",
+          "version": "0.23.2"
+        },
+        {
+          "name": "Code Audit complexity analyzer",
+          "version": "0.2.0"
+        }
+      ],
+      "evidence": [
+        {
+          "observed_at": "2026-11-08",
+          "result": "`raw !== raw!.trimStart()` parsed as call(member(non_null_expression(binary_expression(raw !== raw)), trimStart)); two false leads in a real repository before the guard.",
+          "scope": "One expression shape, TypeScript and TSX grammars",
+          "source": "tree dump from a scratch probe built against the analyzer's Cargo.lock; regression case in code-audit skills/code-principles/scripts/test_multilang_complexity.py"
+        }
+      ],
+      "id": "language-tooling.tree-sitter-typescript.non-null-postfix-binding@0.23.2",
+      "owner": "Code Audit analyzer (runtime/complexity/src/main.rs)",
+      "remediation": "Skip an operand comparison when the right operand is followed by `!`, `.`, `(` or `[` in the source bytes.",
+      "section": "language-tooling",
+      "status": "verified",
+      "symptom": "A self-comparison check reports `raw !== raw` for `raw !== raw!.trimStart()`.",
+      "validity": {
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:no"
+        ],
+        "environment": "macOS; tree-sitter 0.27.0",
+        "limitations": [
+          "One grammar version; only the comparison-then-non-null shape was probed."
+        ],
+        "snapshot": "parsed 2026-11-08",
+        "workspace": "not-applicable"
+      }
+    },
+    {
+      "capability": "if-condition-field-coverage",
+      "cause": "For `if let a` the `condition` field holds only the binding keyword `let`; the bound name is a separate child.",
+      "components": [
+        {
+          "name": "tree-sitter-swift",
+          "version": "0.7.4"
+        },
+        {
+          "name": "Code Audit complexity analyzer",
+          "version": "0.2.0"
+        }
+      ],
+      "evidence": [
+        {
+          "observed_at": "2026-11-08",
+          "result": "`if let a {} else if let b {}` exposed condition `let` for both; 13 of 13 repeated-condition leads in one Swift repository were false before the fix.",
+          "scope": "One Swift repository of about 20,000 functions and one probe file",
+          "source": "tree dump from a scratch probe built against the analyzer's Cargo.lock; regression case in code-audit skills/code-principles/scripts/test_multilang_complexity.py"
+        }
+      ],
+      "id": "language-tooling.tree-sitter-swift.if-let-condition-field@0.7.4",
+      "owner": "Code Audit analyzer (runtime/complexity/src/main.rs)",
+      "remediation": "Read an `if` condition as every child between the keyword and the body, not the `condition` field.",
+      "section": "language-tooling",
+      "status": "verified",
+      "symptom": "Two different `if let` conditions in one else-if chain compare as equal.",
+      "validity": {
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:partial"
+        ],
+        "environment": "macOS; tree-sitter 0.27.0",
+        "limitations": [
+          "One grammar version; `if case` exposes several condition fields and was handled the same way."
+        ],
+        "snapshot": "parsed 2026-11-08",
+        "workspace": "not-applicable"
+      }
+    },
+    {
+      "capability": "javascript-parsing-with-tsx-grammar",
+      "cause": "The TSX grammar extends the JavaScript grammar.",
+      "components": [
+        {
+          "name": "tree-sitter-typescript",
+          "version": "0.23.2"
+        },
+        {
+          "name": "Code Audit complexity analyzer",
+          "version": "0.2.0"
+        }
+      ],
+      "evidence": [
+        {
+          "observed_at": "2026-11-08",
+          "result": "267 .js, .mjs and .cjs files across three repositories parsed with the TSX grammar; 1 file had parse errors.",
+          "scope": "Three repositories; file extensions .js, .jsx, .mjs, .cjs",
+          "source": "tree dump from a scratch probe built against the analyzer's Cargo.lock; regression case in code-audit skills/code-principles/scripts/test_multilang_complexity.py"
+        }
+      ],
+      "id": "language-tooling.tree-sitter-typescript.javascript-through-tsx@0.23.2",
+      "owner": "Code Audit analyzer (runtime/complexity/src/main.rs)",
+      "remediation": "Parse JavaScript with the TSX grammar and report it under its own language name.",
+      "section": "language-tooling",
+      "status": "verified",
+      "symptom": "JavaScript files need a parser when only the TypeScript grammars are bundled.",
+      "validity": {
+        "build_target": "not-applicable",
+        "capabilities": [
+          "support:yes"
+        ],
+        "environment": "macOS; tree-sitter 0.27.0",
+        "limitations": [
+          "Flow-typed JavaScript was not in the sample.",
+          "Parse-error files are reported as gaps by the analyzer, not silently dropped."
+        ],
+        "snapshot": "parsed 2026-11-08",
+        "workspace": "not-applicable"
+      }
     }
   ],
   "schema_version": 1

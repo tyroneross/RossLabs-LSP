@@ -153,6 +153,16 @@
       "notes": "Read manifests/targets/features first. Private unit tests stay in their crate; integration tests use public APIs; shared support is dev-only. Record readiness and cfg/feature/platform scope: empty references do not prove absence across configurations. Rust indexing can execute build scripts/proc macros; use static source/Architect for no-execution reviews. LSP does not discover every test or prove behavior; transport failure means unknown."
     },
     {
+      "id": "code-structure-across-languages",
+      "dimension": "component",
+      "topic": "Simplifying, renaming, inlining or removing code, and structure leads across languages",
+      "keywords": ["code-structure-across-languages", "simplify", "simplification", "refactor", "refactoring", "rename", "inline", "extract", "nesting", "complexity", "hotspot", "hotspots", "duplicate", "cleanup", "code-audit"],
+      "use": "refs/def before the edit + Code Audit complexity.py, hotspots.py and structure_delta.py",
+      "mcp": "refs {file, symbol}; def {file, symbol}",
+      "cli": "rosslabs-lsp refs --symbol <name> --path <root>; python3 <code-audit>/skills/code-principles/scripts/structure_delta.py <root>",
+      "notes": "List references before renaming, inlining, extracting or removing a symbol. Go and Java have no server here: use rg -nw and say the search was textual. The same construct differs by language, and Code Audit's analyzer (runtime/complexity/src/main.rs) encodes each form: an else-if hangs under an else clause in Rust and TypeScript, is the alternative field in Java and Go, a direct child in Swift, and an orelse of one If at the same column in Python; `if let`, `if case` and `instanceof` patterns bind names only one branch reads; Go `a, b int` is two parameters; a Python method's self or cls and a Rust self are receivers, not parameters; Python `NAME = NAME` at module level is a deliberate rebind; JavaScript `x & x` coerces to a 32-bit integer; `x != x` is the NaN test. Grammar limits are recorded evidence: compat --section language-tooling."
+    },
+    {
       "id": "agent-hooks",
       "dimension": "component",
       "topic": "Agent hooks (Claude Code, Codex hook events, payloads, timeouts)",
